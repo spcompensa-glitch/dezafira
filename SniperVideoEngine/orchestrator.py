@@ -5,6 +5,23 @@ try:
 except ImportError:
     from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
 
+def set_clip_duration(clip, duration):
+    if hasattr(clip, "with_duration"):
+        return clip.with_duration(duration)
+    return clip.set_duration(duration)
+
+def set_clip_volume(clip, volume):
+    if hasattr(clip, "with_volume_scaled"):
+        return clip.with_volume_scaled(volume)
+    if hasattr(clip, "volumex"):
+        return clip.volumex(volume)
+    return clip
+
+def set_clip_audio(clip, audio):
+    if hasattr(clip, "with_audio"):
+        return clip.with_audio(audio)
+    return clip.set_audio(audio)
+
 def transcribe_audio_to_words(audio_path):
     """
     Transcreve o áudio e retorna timestamps detalhados palavra por palavra.
@@ -37,20 +54,25 @@ def assemble_video(video_path, voice_path, output_path, music_path=None, music_v
     video = VideoFileClip(video_path)
     voice = AudioFileClip(voice_path)
     
-    # Ajustar duração do vídeo para bater com a voz
+    # Ajustar duração do vídeo para bater com a voz de forma compatível
     if video.duration < voice.duration:
-        video = video.loop(duration=voice.duration)
+        from moviepy.editor import concatenate_videoclips
+        n_repeats = int(voice.duration / video.duration) + 1
+        video = concatenate_videoclips([video] * n_repeats)
+        video = set_clip_duration(video, voice.duration)
     else:
-        video = video.with_duration(voice.duration)
+        video = set_clip_duration(video, voice.duration)
     
     # 2. Mesclar faixas de áudio
     audio_tracks = [voice]
     if music_path and os.path.exists(music_path):
-        music = AudioFileClip(music_path).with_volume_scaled(music_volume).with_duration(voice.duration)
+        music = AudioFileClip(music_path)
+        music = set_clip_volume(music, music_volume)
+        music = set_clip_duration(music, voice.duration)
         audio_tracks.append(music)
     
     final_audio = CompositeAudioClip(audio_tracks)
-    video = video.with_audio(final_audio)
+    video = set_clip_audio(video, final_audio)
     
     # 3. Gerar e queimar legendas dinâmicas (Estilo TikTok/Shorts)
     if add_subtitles:
