@@ -287,6 +287,9 @@ async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, bac
                     if "signin" not in page.url and "login" not in page.url:
                         login_ok = True
                     browser.close()
+            except Exception as e:
+                print(f"[Agent-Login] Erro ao testar cookies: {e}")
+                login_ok = False
             warning_msg = None
             if not login_ok:
                 warning_msg = "Sessão importada! (Nota: o servidor de nuvem do Railway não pôde confirmar a sessão devido ao IP do data center, mas salvou seus cookies com sucesso e eles serão aplicados na postagem)."
