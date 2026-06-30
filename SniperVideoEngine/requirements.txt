@@ -10,4 +10,7 @@ redis==5.0.3
 python-dotenv==1.0.1
 requests==2.31.0
 websocket-client==1.7.0
+whisper-timestamped==1.14.4
+moviepy==1.0.3
+
 
