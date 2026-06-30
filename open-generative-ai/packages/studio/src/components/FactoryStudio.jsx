@@ -921,7 +921,7 @@ export default function FactoryStudio({ apiKey }) {
                         <span className="text-[9px] text-white/30">{video.created_at}</span>
                       </div>
                       <button
-                        onClick={() => setVideoUrl(video.video_url)}
+                        onClick={() => setVideoUrl(video.video_url ? `${API_BASE_URL}${video.video_url}` : null)}
                         className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all"
                       >
                         Assistir 🎬
