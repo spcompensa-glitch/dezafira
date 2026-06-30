@@ -3,7 +3,13 @@ import whisper_timestamped as whisper
 try:
     from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
 except ImportError:
-    from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
+    try:
+        from moviepy.video.io.VideoFileClip import VideoFileClip
+        from moviepy.audio.io.AudioFileClip import AudioFileClip
+        from moviepy.audio.AudioClip import CompositeAudioClip
+        from moviepy.video.VideoClip import CompositeVideoClip, TextClip
+    except ImportError:
+        from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
 
 def set_clip_duration(clip, duration):
     if hasattr(clip, "with_duration"):

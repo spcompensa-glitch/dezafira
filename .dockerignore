@@ -1,0 +1,33 @@
+.git
+.gitignore
+.dockerignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.idea/
+.vscode/
+
+# Ignore frontend node_modules and builds
+frontend-livekit/node_modules/
+frontend-livekit/.next/
+frontend-livekit/out/
+frontend-livekit/build/
+frontend-livekit/.DS_Store
+*.log
+
+# Ignore aios-core agent environment if present
+aios-core/
+.agent/
+
+# Temp and large files
+Smart_Money_Decoded.pdf
+*.db
+*.log
+*.pdf
+tmp/
+
