@@ -1,0 +1,38 @@
+# Dependências
+node_modules/
+.next/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# Arquivos locais e caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Banco de dados e dados locais da Dezafira
+dezafira.db
+dezafira.db-journal
+channels.json
+temp/
+outputs/
+SniperVideoEngine/temp/
+SniperVideoEngine/outputs/
+
+# Segredos (NUNCA COMMITAR CHAVES DE API!)
+.env
+SniperVideoEngine/.env
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
