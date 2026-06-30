@@ -54,6 +54,11 @@ export default function FactoryStudio({ apiKey }) {
   const [loginError, setLoginError] = useState(null);
   const loginPollingRef = useRef(null);
 
+  // Estados dos Canais Criados por IA (Dezafira Autônoma)
+  const [aiChannels, setAiChannels] = useState([]);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
   const handleConnectYouTube = () => {
     if (selectedChannel === 'default') {
       alert('Por favor, selecione um canal cadastrado para conectar.');
@@ -140,6 +145,27 @@ export default function FactoryStudio({ apiKey }) {
     }
   };
 
+  const renderMarkdown = (text) => {
+    if (!text) return null;
+    return text.split('\n').map((line, i) => {
+      if (line.startsWith('### ')) {
+        return <h3 key={i} className="text-sm font-bold text-white mt-3 mb-1.5 uppercase tracking-wide">{line.replace('### ', '')}</h3>;
+      }
+      const boldRegex = /\*\*(.*?)\*\*/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      while ((match = boldRegex.exec(line)) !== null) {
+        parts.push(line.substring(lastIndex, match.index));
+        parts.push(<strong key={match.index} className="text-primary font-bold">{match[1]}</strong>);
+        lastIndex = boldRegex.lastIndex;
+      }
+      parts.push(line.substring(lastIndex));
+      
+      return <p key={i} className="text-xs text-white/70 leading-relaxed mb-2">{parts.length > 1 ? parts : line}</p>;
+    });
+  };
+
   const pollingIntervalRef = useRef(null);
   const chatBottomRef = useRef(null);
 
@@ -176,6 +202,9 @@ export default function FactoryStudio({ apiKey }) {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/v1/channels`);
       setChannels(res.data);
+      
+      const aiRes = await axios.get(`${API_BASE_URL}/api/v1/ai-channels`);
+      setAiChannels(aiRes.data);
     } catch (err) {
       console.error('Erro ao buscar canais:', err);
     }
@@ -326,100 +355,66 @@ export default function FactoryStudio({ apiKey }) {
       {/* Grid Ultrawide de 3 Colunas */}
       <div className="flex-1 w-full grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto lg:overflow-hidden custom-scrollbar pr-0 lg:pr-2">
         
-        {/* COLUNA 1: Canais & Tendências */}
+        {/* COLUNA 1: Contas Google Conectadas */}
         <div className="flex flex-col gap-6 lg:h-full lg:overflow-y-auto custom-scrollbar pr-0 lg:pr-2">
-          {/* Gerenciar Canais */}
+          {/* Gerenciar Contas Google */}
           <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2">🌐 Canais Ativos</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2">🔑 Contas Google</h3>
             
-            {/* Lista de Canais com Status de Monetização */}
+            {/* Lista de Contas com Status de Conexão */}
             <div className="flex flex-col gap-3 max-h-[220px] overflow-y-auto custom-scrollbar">
               {channels.map((chan) => (
                 <div key={chan.id} className="flex flex-col bg-white/5 border border-white/5 rounded-xl p-3.5 gap-2.5 text-xs">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="bg-white/10 text-[9px] font-black px-1.5 py-0.5 rounded text-primary">
-                        {chan.lang}
-                      </span>
+                      <span className={`w-2.5 h-2.5 rounded-full ${
+                        chan.connection_status === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'
+                      }`} />
                       <div className="flex flex-col">
                         <span className="font-bold text-white/90">{chan.name}</span>
-                        <span className="text-[10px] text-white/40">{chan.nicho}</span>
+                        <span className="text-[10px] text-white/40">
+                          {chan.connection_status === 'connected' ? 'Ativa (Sessão Salva)' : 'Aguardando Login 🔑'}
+                        </span>
                       </div>
                     </div>
                     <button 
                       onClick={() => handleDeleteChannel(chan.id)}
                       className="text-white/30 hover:text-red-400 p-1 transition-colors"
+                      title="Remover Conta"
                     >
                       ✕
                     </button>
                   </div>
 
-                  {/* Barra de Progresso de Monetização */}
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-white/45">
-                      <span>Mapeamento</span>
-                      <span className={
-                        chan.monetization_step === 'monetized' ? 'text-emerald-400 animate-pulse font-black' : 'text-white/60'
-                      }>
-                        {chan.monetization_step === 'setup' && 'Setup ⚙️'}
-                        {chan.monetization_step === 'linked' && 'Vinculado 🔗'}
-                        {chan.monetization_step === 'publishing' && 'Postagens 📈'}
-                        {chan.monetization_step === 'viral' && 'Viralizando 🔥'}
-                        {chan.monetization_step === 'monetized' && 'Monetizado 💰'}
-                      </span>
+                  {/* Detalhes de Erro se houver */}
+                  {chan.connection_error && (
+                    <div className="text-[10px] text-red-400 bg-red-500/5 border border-red-500/10 p-2 rounded-lg">
+                      ⚠️ {chan.connection_error}
                     </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          chan.monetization_step === 'setup' ? 'w-[20%] bg-rose-500' :
-                          chan.monetization_step === 'linked' ? 'w-[40%] bg-blue-500' :
-                          chan.monetization_step === 'publishing' ? 'w-[60%] bg-purple-500' :
-                          chan.monetization_step === 'viral' ? 'w-[80%] bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]' :
-                          'w-[100%] bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                        }`}
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Cadastro de Canais */}
+            {/* Vincular Nova Conta */}
             <form onSubmit={handleAddChannel} className="flex flex-col gap-2.5 pt-2 border-t border-white/5">
               <input
-                type="text"
+                type="email"
                 value={chanName}
                 onChange={(e) => setChanName(e.target.value)}
-                placeholder="Nome do Novo Canal..."
+                placeholder="E-mail da Nova Conta Google..."
                 className="bg-white/5 border border-white/10 rounded-lg p-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-primary/50"
+                required
               />
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={chanNicho}
-                  onChange={(e) => setChanNicho(e.target.value)}
-                  className="bg-[#0c0c0c] border border-white/10 rounded-lg p-2 text-xs text-white/80"
+              <div className="grid grid-cols-1">
+                <button
+                  type="submit"
+                  disabled={isAddingChannel}
+                  className="bg-primary hover:bg-[#1ed760] text-black text-xs font-bold py-2.5 rounded-lg transition-colors select-none"
                 >
-                  <option value="Geral">Geral</option>
-                  <option value="Dropshipping">Dropshipping</option>
-                  <option value="Cripto">Finanças</option>
-                </select>
-                <select
-                  value={chanLang}
-                  onChange={(e) => setChanLang(e.target.value)}
-                  className="bg-[#0c0c0c] border border-white/10 rounded-lg p-2 text-xs text-white/80"
-                >
-                  <option value="PT">PT (Português)</option>
-                  <option value="EN">EN (Inglês)</option>
-                  <option value="ES">ES (Espanhol)</option>
-                </select>
+                  {isAddingChannel ? 'Registrando...' : 'Registrar Conta Google'}
+                </button>
               </div>
-              <button
-                type="submit"
-                disabled={isAddingChannel}
-                className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold transition-all text-white/90"
-              >
-                Cadastrar Canal
-              </button>
             </form>
           </div>
 
@@ -455,17 +450,70 @@ export default function FactoryStudio({ apiKey }) {
           </div>
         </div>
 
-        {/* COLUNA 2: Hermes (O Cérebro & Chat) */}
-        <div className="flex flex-col gap-6 lg:h-full overflow-hidden">
+        {/* COLUNA 2: Fábrica Autônoma de Canais (Criação de Canais por IA) */}
+        <div className="flex flex-col gap-6 lg:h-full lg:overflow-y-auto custom-scrollbar pr-0 lg:pr-2">
+          {/* Canais Autônomos Criados por IA */}
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2">🤖 Canais Criados por IA</h3>
+            
+            <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto custom-scrollbar">
+              {aiChannels.length > 0 ? (
+                aiChannels.map((sub) => (
+                  <div key={sub.id} className="flex flex-col bg-white/5 border border-white/5 rounded-xl p-3.5 gap-2.5 text-xs relative group animate-fade-in-up">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-primary/10 text-[9px] font-black px-1.5 py-0.5 rounded text-primary">
+                          {sub.lang}
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-white/90">{sub.name}</span>
+                          <span className="text-[10px] text-white/40">{sub.nicho}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        Ativo
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-white/50 bg-black/20 p-2 rounded-lg">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] uppercase tracking-wider text-white/30">Inscritos</span>
+                        <span className="font-bold text-white/80">{sub.subscribers.toLocaleString()} 👥</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] uppercase tracking-wider text-white/30">Vídeos Postados</span>
+                        <span className="font-bold text-white/80">{sub.videos_posted} 🎬</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedReport(sub);
+                        setIsReportModalOpen(true);
+                      }}
+                      className="w-full mt-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-bold py-2 rounded-lg transition-all"
+                    >
+                      Ver Relatório Estratégico 📋
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-white/35 py-12 text-xs">
+                  Nenhum canal autônomo criado ainda. Aguardando orquestração do Hermes...
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Chat do Hermes (NVIDIA NIM) */}
-          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex-1 flex flex-col overflow-hidden min-h-[350px]">
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex-1 flex flex-col overflow-hidden min-h-[250px]">
             <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2 flex items-center justify-between">
               <span>💬 Conversar com Hermes</span>
               <span className="text-[9px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">Nvidia NIM API</span>
             </h3>
             
             {/* Corpo das Mensagens */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar my-4 space-y-3 pr-1 text-xs">
+            <div className="flex-1 overflow-y-auto custom-scrollbar my-3 space-y-3 pr-1 text-xs">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[85%] p-3 rounded-2xl ${
@@ -493,13 +541,13 @@ export default function FactoryStudio({ apiKey }) {
             </div>
 
             {/* Input do Chat */}
-            <form onSubmit={handleSendChatMessage} className="flex gap-2">
+            <form onSubmit={handleSendChatMessage} className="flex gap-2 mt-auto">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Pergunte ou ordene ao Hermes..."
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-white/30 focus:outline-none focus:border-primary/50"
+                placeholder="Ordene ao Hermes..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-primary/50"
                 disabled={isHermesTyping}
               />
               <button
@@ -510,42 +558,6 @@ export default function FactoryStudio({ apiKey }) {
                 Enviar
               </button>
             </form>
-          </div>
-
-          {/* Pipeline Neon de Status */}
-          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex flex-col gap-3">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-white/40">Fase Atual da Esteira</h3>
-            
-            <div className="grid grid-cols-6 gap-1 relative pt-2">
-              {steps.map((step, index) => {
-                const isActive = currentStep === index + 1;
-                const isCompleted = currentStep > index + 1;
-                return (
-                  <div key={index} className="flex flex-col items-center text-center gap-1 relative z-10">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
-                      isActive 
-                        ? 'bg-primary border-primary text-black shadow-[0_0_12px_rgba(34,211,238,0.6)]' 
-                        : isCompleted
-                        ? 'bg-[#1ed760]/20 border-[#1ed760] text-[#1ed760]'
-                        : 'bg-black border-white/10 text-white/30'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <span className={`text-[8px] font-bold uppercase tracking-wider hidden sm:block ${
-                      isActive ? 'text-primary' : 'text-white/30'
-                    }`}>
-                      {step.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {currentStep > 0 && currentStep <= 6 && (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-[10px] text-white/60 text-center font-bold uppercase tracking-wider animate-pulse">
-                ⚙️ {steps[currentStep - 1].desc}
-              </div>
-            )}
           </div>
         </div>
 
@@ -808,6 +820,44 @@ export default function FactoryStudio({ apiKey }) {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE RELATÓRIO ESTRATÉGICO DA IA */}
+      {isReportModalOpen && selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-lg bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 shadow-2xl flex flex-col gap-4 relative">
+            <button 
+              onClick={() => {
+                setIsReportModalOpen(false);
+                setSelectedReport(null);
+              }}
+              className="absolute right-4 top-4 text-white/40 hover:text-white transition-all text-lg font-bold"
+            >
+              ✕
+            </button>
+
+            <div className="flex flex-col gap-1 border-b border-white/5 pb-3">
+              <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Análise de Mercado autônoma</span>
+              <h2 className="text-lg font-black text-white">{selectedReport.name}</h2>
+            </div>
+
+            <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+              {renderMarkdown(selectedReport.creation_reason)}
+            </div>
+
+            <div className="flex gap-2.5 pt-2 border-t border-white/5 mt-2">
+              <button 
+                onClick={() => {
+                  setIsReportModalOpen(false);
+                  setSelectedReport(null);
+                }}
+                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold p-3 rounded-xl transition-all"
+              >
+                Fechar Relatório
+              </button>
+            </div>
           </div>
         </div>
       )}

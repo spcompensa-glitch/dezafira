@@ -21,7 +21,10 @@ from modules.database import (
     update_db_prediction, 
     get_db_prediction,
     Channel,
-    SessionLocal
+    SessionLocal,
+    get_db_ai_created_channels,
+    create_db_ai_created_channel,
+    delete_db_ai_created_channel
 )
 from modules.telegram_bot import init_telegram_bot, send_telegram_notification
 
@@ -290,6 +293,34 @@ async def submit_verification_code(channel_id: str, payload: Submit2FAPayload):
     db.commit()
     db.close()
     return {"message": "Código de verificação 2FA enviado com sucesso para o agente."}
+
+@app.get("/api/v1/ai-channels")
+async def get_ai_channels():
+    return get_db_ai_created_channels()
+
+class AiChannelPayload(BaseModel):
+    channel_id: str
+    name: str
+    nicho: str
+    lang: str
+    creation_reason: str
+
+@app.post("/api/v1/ai-channels")
+async def create_ai_channel(payload: AiChannelPayload):
+    return create_db_ai_created_channel(
+        payload.channel_id, 
+        payload.name, 
+        payload.nicho, 
+        payload.lang, 
+        payload.creation_reason
+    )
+
+@app.delete("/api/v1/ai-channels/{sub_id}")
+async def delete_ai_channel(sub_id: str):
+    success = delete_db_ai_created_channel(sub_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Canal criado por IA não encontrado")
+    return {"message": "Canal removido com sucesso"}
 
 class AnalyzeVideoPayload(BaseModel):
     url: str

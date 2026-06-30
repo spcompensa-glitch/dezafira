@@ -45,6 +45,19 @@ class Channel(Base):
     verification_code = Column(String(20), nullable=True)
     connection_error = Column(String(500), nullable=True)
 
+class AiCreatedChannel(Base):
+    __tablename__ = "ai_created_channels"
+
+    id = Column(String(50), primary_key=True, index=True)
+    channel_id = Column(String(50), nullable=False) # FK do Canal da conta Google
+    name = Column(String(100), nullable=False)
+    nicho = Column(String(100), default="Geral")
+    lang = Column(String(10), default="PT")
+    creation_reason = Column(String(2000), nullable=True)
+    subscribers = Column(Integer, default=0)
+    videos_posted = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Prediction(Base):
     __tablename__ = "predictions"
 
@@ -72,16 +85,54 @@ def get_db_channels():
     db = SessionLocal()
     try:
         channels = db.query(Channel).all()
-        # Se o banco estiver vazio, cria os canais de teste iniciais
+        # Se o banco estiver vazio, cria as contas Google e canais criados por IA de teste iniciais
         if not channels:
             initial_channels = [
-                Channel(id="ch_1", name="Dropshipping Prático", nicho="Dropshipping", lang="PT", status="active", monetization_step="publishing"),
-                Channel(id="ch_2", name="Global Tech Trends", nicho="Geral", lang="EN", status="active", monetization_step="setup"),
-                Channel(id="ch_3", name="Finanzas & Cripto", nicho="Cripto", lang="ES", status="active", monetization_step="viral")
+                Channel(id="ch_1", name="jonatas.canais@gmail.com", nicho="Geral", lang="PT", status="active", monetization_step="publishing"),
+                Channel(id="ch_2", name="dezafira.global@gmail.com", nicho="Geral", lang="EN", status="active", monetization_step="setup")
             ]
             for c in initial_channels:
                 db.add(c)
             db.commit()
+            
+            # Adiciona os subcanais de teste criados por IA
+            initial_ai_channels = [
+                AiCreatedChannel(
+                    id="sub_1",
+                    channel_id="ch_1",
+                    name="Dropshipping Prático",
+                    nicho="Dropshipping",
+                    lang="PT",
+                    creation_reason=(
+                        "### 📊 Relatório Estratégico de Criação — Dropshipping Prático\n\n"
+                        "Este canal foi criado autonomamente pela Dezafira após identificar que o volume de pesquisas por "
+                        "**'Dropshipping sem estoque com Inteligência Artificial'** cresceu **240%** no Brasil na última semana de junho de 2026.\n\n"
+                        "**Oportunidade**: A concorrência para este termo específico em formato vertical (YouTube Shorts) é classificada como **Baixa**, "
+                        "garantindo um carregamento rápido de impressões orgânicas e atração acelerada de público qualificado."
+                    ),
+                    subscribers=1420,
+                    videos_posted=18
+                ),
+                AiCreatedChannel(
+                    id="sub_2",
+                    channel_id="ch_1",
+                    name="Global Tech Trends",
+                    nicho="Tech",
+                    lang="EN",
+                    creation_reason=(
+                        "### 📊 Relatório Estratégico de Criação — Global Tech Trends\n\n"
+                        "Decisão baseada no tráfego massivo global de pesquisas voltadas para os novos chips neuromórficos e avanço de "
+                        "desenvolvimento de robótica humanóide em mercados norte-americanos.\n\n"
+                        "**Oportunidade**: Audiência internacional altamente monetizada por RPM elevado em tecnologia."
+                    ),
+                    subscribers=540,
+                    videos_posted=12
+                )
+            ]
+            for ac in initial_ai_channels:
+                db.add(ac)
+            db.commit()
+            
             channels = db.query(Channel).all()
             
         return [
@@ -193,5 +244,62 @@ def get_db_prediction(pred_id: str):
                 "url": pred.video_url
             }
         return None
+    finally:
+        db.close()
+
+def get_db_ai_created_channels() -> list:
+    db = SessionLocal()
+    try:
+        channels = db.query(AiCreatedChannel).order_by(AiCreatedChannel.created_at.desc()).all()
+        return [
+            {
+                "id": c.id,
+                "channel_id": c.channel_id,
+                "name": c.name,
+                "nicho": c.nicho,
+                "lang": c.lang,
+                "creation_reason": c.creation_reason,
+                "subscribers": c.subscribers,
+                "videos_posted": c.videos_posted,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            } for c in channels
+        ]
+    finally:
+        db.close()
+
+def create_db_ai_created_channel(channel_id: str, name: str, nicho: str, lang: str, creation_reason: str):
+    db = SessionLocal()
+    try:
+        import uuid
+        new_sub = AiCreatedChannel(
+            id=f"sub_{uuid.uuid4().hex[:6]}",
+            channel_id=channel_id,
+            name=name,
+            nicho=nicho,
+            lang=lang,
+            creation_reason=creation_reason,
+            subscribers=0,
+            videos_posted=0
+        )
+        db.add(new_sub)
+        db.commit()
+        return {
+            "id": new_sub.id,
+            "name": new_sub.name,
+            "nicho": new_sub.nicho,
+            "lang": new_sub.lang
+        }
+    finally:
+        db.close()
+
+def delete_db_ai_created_channel(sub_id: str) -> bool:
+    db = SessionLocal()
+    try:
+        sub = db.query(AiCreatedChannel).filter(AiCreatedChannel.id == sub_id).first()
+        if sub:
+            db.delete(sub)
+            db.commit()
+            return True
+        return False
     finally:
         db.close()
