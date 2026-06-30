@@ -21,6 +21,7 @@ from modules.database import (
     update_db_prediction, 
     get_db_prediction,
     Channel,
+    Prediction,
     SessionLocal,
     get_db_ai_created_channels,
     create_db_ai_created_channel,
