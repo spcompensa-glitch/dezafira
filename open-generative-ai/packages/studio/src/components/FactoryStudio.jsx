@@ -109,14 +109,17 @@ export default function FactoryStudio({ apiKey }) {
     setLoginStatus('importing_cookies');
     setLoginError(null);
     try {
-      await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/login-stealth`, {
+      const res = await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/login-stealth`, {
         cookies_raw: loginCookiesRaw
       });
+      if (res.data.warning) {
+        alert(res.data.warning);
+      }
       setLoginStatus('connected');
       fetchChannels();
       setTimeout(() => {
         setIsLoginModalOpen(false);
-      }, 2000);
+      }, 3000);
     } catch (err) {
       console.error(err);
       setLoginStatus('failed');

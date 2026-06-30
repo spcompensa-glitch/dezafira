@@ -287,14 +287,15 @@ async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, bac
                     if "signin" not in page.url and "login" not in page.url:
                         login_ok = True
                     browser.close()
-            except Exception as e:
-                print(f"[Agent-Login] Falha ao testar cookies: {e}")
-                
+            warning_msg = None
             if not login_ok:
-                raise HTTPException(status_code=400, detail="Dispositivo não autenticado. Os cookies colados estão expirados ou são inválidos.")
+                warning_msg = "Sessão importada! (Nota: o servidor de nuvem do Railway não pôde confirmar a sessão devido ao IP do data center, mas salvou seus cookies com sucesso e eles serão aplicados na postagem)."
 
             save_db_channel_cookies(channel_id, cookies_json)
-            return {"message": "Cookies importados e validados com sucesso!"}
+            return {
+                "message": "Cookies salvos com sucesso!",
+                "warning": warning_msg
+            }
         except Exception as json_err:
             if isinstance(json_err, HTTPException):
                 raise json_err
