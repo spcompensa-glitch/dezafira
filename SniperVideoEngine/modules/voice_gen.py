@@ -5,13 +5,30 @@ import os
 async def generate_voice(text, output_path, voice="pt-BR-AntonioNeural"):
     """
     Gera um arquivo de áudio a partir de um texto usando Edge-TTS.
-    Vozes recomendadas: 
-    - pt-BR-AntonioNeural (Masculina)
-    - pt-BR-FranciscaNeural (Feminina)
+    Fallback para gTTS se houver erro 403 do Edge-TTS no servidor.
     """
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(output_path)
-    print(f"Áudio gerado com sucesso: {output_path}")
+    try:
+        communicate = edge_tts.Communicate(text, voice)
+        await communicate.save(output_path)
+        print(f"Áudio gerado com sucesso via Edge-TTS: {output_path}")
+    except Exception as e:
+        print(f"[Voice-Gen] ⚠️ Falha no Edge-TTS ({e}). Tentando fallback com gTTS...")
+        try:
+            from gtts import gTTS
+            lang = "pt"
+            if "en-" in voice.lower():
+                lang = "en"
+            elif "es-" in voice.lower():
+                lang = "es"
+                
+            def save_gtts():
+                tts = gTTS(text=text, lang=lang, slow=False)
+                tts.save(output_path)
+            
+            await asyncio.to_thread(save_gtts)
+            print(f"[Voice-Gen] Áudio gerado com sucesso via gTTS (Google Fallback): {output_path}")
+        except Exception as fallback_err:
+            raise Exception(f"Ambos os motores de voz falharam. Edge-TTS: {e} | gTTS: {fallback_err}")
 
 if __name__ == "__main__":
     # Teste rápido
