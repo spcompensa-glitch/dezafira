@@ -249,15 +249,26 @@ class LoginStealthPayload(BaseModel):
 
 @app.post("/api/v1/channels/{channel_id}/login-stealth")
 async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, background_tasks: BackgroundTasks):
+    db = SessionLocal()
+    chan = db.query(Channel).filter(Channel.id == channel_id).first()
+    if not chan:
+        db.close()
+        raise HTTPException(status_code=404, detail="Conta Google não encontrada no banco. Selecione uma conta válida no seletor à direita.")
+    db.close()
+
     # Se o usuário optou por colar os cookies diretamente, pula o robô de digitação e salva na hora!
     if payload.cookies_raw:
         from modules.database import save_db_channel_cookies
         try:
             cookies_json = payload.cookies_raw.strip()
             json.loads(cookies_json)
-            save_db_channel_cookies(channel_id, cookies_json)
+            success = save_db_channel_cookies(channel_id, cookies_json)
+            if not success:
+                raise HTTPException(status_code=400, detail="Falha ao salvar os cookies de sessão no banco.")
             return {"message": "Cookies importados e salvos com sucesso!"}
         except Exception as json_err:
+            if isinstance(json_err, HTTPException):
+                raise json_err
             raise HTTPException(status_code=400, detail=f"Formato de cookies inválido. Cole um JSON válido: {str(json_err)}")
 
     from modules.agent_login import run_agent_login_stealth

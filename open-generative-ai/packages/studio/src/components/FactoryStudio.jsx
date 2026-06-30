@@ -63,7 +63,7 @@ export default function FactoryStudio({ apiKey }) {
 
   const handleConnectYouTube = () => {
     if (selectedChannel === 'default') {
-      alert('Por favor, selecione um canal cadastrado para conectar.');
+      alert('Por favor, selecione uma Conta Google cadastrada no painel antes de vincular.');
       return;
     }
     setLoginEmail('');
