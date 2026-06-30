@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, DateTime, JSON, ForeignKey, Integer
+from sqlalchemy import create_engine, Column, String, DateTime, JSON, ForeignKey, Integer, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # 1. Determinar URL do banco de dados (Railway Postgres ou SQLite local)
@@ -77,7 +77,8 @@ try:
     # Simple manual migration for approval_status if it's missing (helps fix internal 500 in prod)
     with engine.connect() as conn:
         try:
-            conn.execute("ALTER TABLE predictions ADD COLUMN approval_status VARCHAR(30) DEFAULT 'pending';")
+            conn.execute(text("ALTER TABLE predictions ADD COLUMN approval_status VARCHAR(30) DEFAULT 'pending';"))
+            conn.commit()
             print("[Database] Coluna approval_status adicionada na tabela predictions.")
         except Exception:
             pass # A coluna já existe
