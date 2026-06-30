@@ -256,6 +256,9 @@ async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, bac
         raise HTTPException(status_code=404, detail="Conta Google não encontrada no banco. Selecione uma conta válida no seletor à direita.")
     db.close()
 
+    if not payload.cookies_raw and (not payload.email or not payload.password):
+        raise HTTPException(status_code=400, detail="Credenciais ou cookies ausentes na requisição.")
+
     # Se o usuário optou por colar os cookies diretamente, pula o robô de digitação e salva na hora!
     if payload.cookies_raw:
         from modules.database import save_db_channel_cookies

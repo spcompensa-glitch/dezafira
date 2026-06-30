@@ -105,6 +105,7 @@ export default function FactoryStudio({ apiKey }) {
       alert('Por favor, cole o JSON de cookies extraído do YouTube.');
       return;
     }
+    if (loginPollingRef.current) clearInterval(loginPollingRef.current);
     setLoginStatus('typing_email');
     setLoginError(null);
     try {
