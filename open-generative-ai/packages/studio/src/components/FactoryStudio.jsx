@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:8000' : ''))
+  : 'http://127.0.0.1:8000';
+
 export default function FactoryStudio({ apiKey }) {
   // Estados da Fábrica de Vídeos
   const [theme, setTheme] = useState('');
@@ -44,7 +48,7 @@ export default function FactoryStudio({ apiKey }) {
   const handleConnectYouTube = async () => {
     setStatus('Abrindo navegador do YouTube Studio na sua máquina...');
     try {
-      await axios.post(`http://127.0.0.1:8000/api/v1/channels/${selectedChannel}/connect`);
+      await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/connect`);
       alert('Navegador de Login aberto! Realize o login no YouTube Studio na janela que apareceu e a sessão será salva automaticamente.');
     } catch (err) {
       console.error(err);
@@ -87,7 +91,7 @@ export default function FactoryStudio({ apiKey }) {
   const fetchTrends = async (nicho) => {
     setIsLoadingTrends(true);
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/api/v1/trends?query=${nicho}`);
+      const res = await axios.get(`${API_BASE_URL}/api/v1/trends?query=${nicho}`);
       setTrends(res.data);
     } catch (err) {
       console.error('Erro ao buscar tendências:', err);
@@ -98,7 +102,7 @@ export default function FactoryStudio({ apiKey }) {
 
   const fetchChannels = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/v1/channels');
+      const res = await axios.get(`${API_BASE_URL}/api/v1/channels`);
       setChannels(res.data);
     } catch (err) {
       console.error('Erro ao buscar canais:', err);
@@ -107,7 +111,7 @@ export default function FactoryStudio({ apiKey }) {
 
   const fetchHermesHistory = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/v1/hermes/history');
+      const res = await axios.get(`${API_BASE_URL}/api/v1/hermes/history`);
       if (res.data.history) {
         setChatMessages(res.data.history);
       }
@@ -121,7 +125,7 @@ export default function FactoryStudio({ apiKey }) {
     if (!chanName.trim()) return;
     setIsAddingChannel(true);
     try {
-      await axios.post('http://127.0.0.1:8000/api/v1/channels', {
+      await axios.post(`${API_BASE_URL}/api/v1/channels`, {
         name: chanName,
         nicho: chanNicho,
         lang: chanLang
@@ -138,7 +142,7 @@ export default function FactoryStudio({ apiKey }) {
   const handleDeleteChannel = async (id) => {
     if (!confirm('Deseja realmente remover este canal?')) return;
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/v1/channels/${id}`);
+      await axios.delete(`${API_BASE_URL}/api/v1/channels/${id}`);
       fetchChannels();
     } catch (err) {
       console.error('Erro ao remover canal:', err);
@@ -155,7 +159,7 @@ export default function FactoryStudio({ apiKey }) {
     setIsHermesTyping(true);
 
     try {
-      const res = await axios.post('http://127.0.0.1:8000/api/v1/hermes/chat', {
+      const res = await axios.post(`${API_BASE_URL}/api/v1/hermes/chat`, {
         message: userMsg
       });
       setChatMessages(res.data.history);
@@ -170,7 +174,7 @@ export default function FactoryStudio({ apiKey }) {
   };
 
   const pollResult = (predictionId) => {
-    const url = `http://127.0.0.1:8000/api/v1/predictions/${predictionId}/result`;
+    const url = `${API_BASE_URL}/api/v1/predictions/${predictionId}/result`;
     
     pollingIntervalRef.current = setInterval(async () => {
       try {
@@ -188,7 +192,7 @@ export default function FactoryStudio({ apiKey }) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           setStatus('Vídeo gerado e publicado com sucesso!');
           setCurrentStep(6); // Concluído
-          setVideoUrl(`http://127.0.0.1:8000${data.url}`);
+          setVideoUrl(`${API_BASE_URL}${data.url}`);
           setIsProcessing(false);
           fetchHermesHistory(); // Atualizar histórico de logs que o Hermes inseriu
         } else if (currentStatus === 'failed') {
@@ -222,7 +226,7 @@ export default function FactoryStudio({ apiKey }) {
         channel_id: selectedChannel
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/api/v1/predictions', payload);
+      const response = await axios.post(`${API_BASE_URL}/api/v1/predictions`, payload);
       setStatus('Iniciando roteirização e narração...');
       setCurrentStep(2);
       pollResult(response.data.id);
