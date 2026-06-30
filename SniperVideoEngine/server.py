@@ -426,10 +426,32 @@ async def analyze_competitor_video(payload: AnalyzeVideoPayload):
 class ChatPayload(BaseModel):
     message: str
 
+@app.get("/api/v1/predictions/history")
+async def get_predictions_history():
+    db = SessionLocal()
+    preds = db.query(Prediction).filter(Prediction.status == "completed").all()
+    result = [
+        {
+            "id": p.id,
+            "prompt": p.prompt,
+            "video_url": p.video_url,
+            "created_at": p.created_at.strftime("%d/%m %H:%M") if p.created_at else ""
+        } for p in preds
+    ]
+    db.close()
+    return {"history": result}
+
 @app.post("/api/v1/hermes/chat")
-async def chat_with_hermes(payload: ChatPayload):
+async def chat_with_hermes(payload: ChatPayload, background_tasks: BackgroundTasks):
+    user_msg = payload.message.lower().strip()
+    
     # Registrar a mensagem do usuário no histórico
     hermes_chat_history.append({"role": "user", "content": payload.message})
+
+    # Interceptor Inteligente para iniciar esteira real de produção
+    trigger_production = False
+    if any(k in user_msg for k in ["começar", "iniciar", "vamos começar", "go", "start", "produzir"]):
+        trigger_production = True
 
     # Construir instruções do sistema para a persona do Hermes
     system_instruction = (
@@ -447,6 +469,36 @@ async def chat_with_hermes(payload: ChatPayload):
     
     # Salvar resposta do Hermes no histórico
     hermes_chat_history.append({"role": "assistant", "content": response_content})
+    
+    # Se disparou a produção, inicia a BackgroundTask física no backend com um tema quente garimpado!
+    if trigger_production:
+        db = SessionLocal()
+        first_chan = db.query(Channel).filter(Channel.status == "active").first()
+        db.close()
+        
+        channel_id = first_chan.id if first_chan else "default"
+        
+        # Garimpa um tema autônomo baseado no nicho "Dropshipping"
+        autonomous_theme = "Como Criar um Canal no YouTube com IA em 2026"
+        try:
+            trends = trend_hunter.fetch_youtube_trends("Inteligência Artificial")
+            if trends and len(trends) > 0:
+                autonomous_theme = trends[0].get("title", autonomous_theme)
+        except Exception as e:
+            print(f"[Hermes] Erro ao buscar tendências de chat: {e}")
+            
+        # Prepara a predição no banco
+        pred_id = f"sniper_{uuid.uuid4().hex[:8]}"
+        save_db_prediction(pred_id, autonomous_theme, channel_id)
+        
+        # Dispara
+        payload_factory = FactoryPayload(
+            prompt=autonomous_theme,
+            post_to_youtube=True,
+            channel_id=channel_id
+        )
+        log_application_activity("Comando recebido do Chat. Hermes ativou a esteira de IA.")
+        background_tasks.add_task(run_factory_pipeline, pred_id, payload_factory)
     
     return {"reply": response_content, "history": hermes_chat_history}
 

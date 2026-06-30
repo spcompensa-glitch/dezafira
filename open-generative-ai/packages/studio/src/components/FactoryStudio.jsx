@@ -46,6 +46,7 @@ export default function FactoryStudio({ apiKey }) {
   const [isAutopilot, setIsAutopilot] = useState(false);
   const [logs, setLogs] = useState([]);
   const [activeVideoTab, setActiveVideoTab] = useState('shorts');
+  const [videoHistory, setVideoHistory] = useState([]);
 
   // Estados de Login Stealth do Agente (Dezafira)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -209,10 +210,13 @@ export default function FactoryStudio({ apiKey }) {
     fetchHermesHistory();
     fetchTrends('Dropshipping');
     fetchLogs();
+    fetchVideoHistory();
     const logsInterval = setInterval(fetchLogs, 2500);
+    const historyInterval = setInterval(fetchVideoHistory, 5000);
     return () => {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
       clearInterval(logsInterval);
+      clearInterval(historyInterval);
     };
   }, []);
 
@@ -222,6 +226,15 @@ export default function FactoryStudio({ apiKey }) {
       setLogs(res.data.logs || []);
     } catch (err) {
       console.error('Erro ao buscar logs:', err);
+    }
+  };
+
+  const fetchVideoHistory = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/predictions/history`);
+      setVideoHistory(res.data.history || []);
+    } catch (err) {
+      console.error('Erro ao buscar histórico de vídeos:', err);
     }
   };
 
@@ -871,6 +884,33 @@ export default function FactoryStudio({ apiKey }) {
 
             <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs font-medium text-white/60">
               Status: {status}
+            </div>
+          </div>
+
+          {/* Galeria de Histórico de Vídeos Gerados */}
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 luxury-card">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2">🎬 Histórico de Vídeos Gerados</h3>
+            <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto custom-scrollbar">
+              {videoHistory.length > 0 ? (
+                videoHistory.map((video) => (
+                  <div key={video.id} className="bg-white/5 border border-white/5 hover:border-primary/20 p-2.5 rounded-xl flex items-center justify-between text-xs transition-all group animate-fade-in-up">
+                    <div className="flex flex-col gap-1 flex-1 pr-3">
+                      <span className="font-bold text-white/90 truncate max-w-[210px] group-hover:text-primary transition-colors" title={video.prompt}>
+                        {video.prompt}
+                      </span>
+                      <span className="text-[9px] text-white/30">{video.created_at}</span>
+                    </div>
+                    <button
+                      onClick={() => setVideoUrl(video.video_url)}
+                      className="bg-primary/10 hover:bg-primary/30 border border-primary/20 hover:border-primary/40 text-primary text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-[0_0_10px_rgba(30,144,255,0.05)]"
+                    >
+                      Assistir 🎬
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-white/30 py-8 text-xs">Nenhum vídeo salvo no histórico ainda.</div>
+              )}
             </div>
           </div>
         </div>
