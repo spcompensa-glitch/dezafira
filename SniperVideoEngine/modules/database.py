@@ -67,6 +67,7 @@ class Prediction(Base):
     error = Column(String(1000), nullable=True)
     video_url = Column(String(500), nullable=True)
     channel_id = Column(String(50), nullable=True)
+    approval_status = Column(String(30), default="pending")  # pending, approved, rejected
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # Criar tabelas se não existirem com tratamento de erro

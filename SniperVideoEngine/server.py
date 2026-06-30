@@ -163,34 +163,9 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
         cookies_json = channel.cookies if channel else None
         db_sess.close()
 
-        # 2. Upload automático no YouTube Studio se marcado
-        if payload.post_to_youtube:
-            update_db_prediction(prediction_id, "uploading")
-            
-            title = plan.get("title", f"Roteiro Automático: {payload.prompt}")
-            description = plan.get("script", "Vídeo gerado de forma 100% automatizada pelo SniperVideoEngine!")
-            
-            log_application_activity(f"Renderização finalizada. Iniciando upload no canal '{payload.channel_id}' via cookies...")
-            send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Início do upload no YouTube via Playwright simulado...")
-            
-            channel_uploader = YouTubeUploader(channel_id=payload.channel_id)
-            upload_success = channel_uploader.upload_video(
-                video_path=absolute_video_path,
-                title=title[:90],
-                description=description,
-                is_short=True,
-                cookies_json=cookies_json
-            )
-            
-            if upload_success:
-                log_application_activity(f"Sucesso! Vídeo publicado: '{title[:45]}...'")
-                send_telegram_notification(f"✅ *[Publicado!]* O vídeo vertical `{title[:40]}` foi postado com sucesso!")
-            else:
-                log_application_activity("Aviso: Falha ao publicar no YouTube Studio. Cookies podem ter expirado.")
-                send_telegram_notification(f"⚠️ *[Aviso]* Vídeo gerado com sucesso, mas falhou no upload do YouTube.")
-        else:
-            log_application_activity("Geração concluída! Upload pulado (post_to_youtube = False).")
-            send_telegram_notification(f"🎬 *[Esteira Concluída]* Geração finalizada! Vídeo pronto para visualização local.")
+        # 2. Renderização concluída - Aguarda aprovação prévia humana na UI
+        log_application_activity("Renderização concluída! Vídeo salvo no histórico. Aguardando aprovação prévia na UI antes do upload.")
+        send_telegram_notification(f"🎬 *[Esteira]* Vídeo para `{payload.prompt}` pronto! Acesse o painel da dezafira para aprovar e postar no YouTube.")
         
         update_db_prediction(prediction_id, "completed", video_url=final_video_path)
         log_application_activity(f"Esteira do ciclo concluída com sucesso para o ID: {prediction_id}!")
@@ -429,17 +404,90 @@ class ChatPayload(BaseModel):
 @app.get("/api/v1/predictions/history")
 async def get_predictions_history():
     db = SessionLocal()
-    preds = db.query(Prediction).filter(Prediction.status == "completed").all()
+    preds = db.query(Prediction).filter(Prediction.status == "completed").order_by(Prediction.created_at.desc()).all()
     result = [
         {
             "id": p.id,
             "prompt": p.prompt,
             "video_url": p.video_url,
+            "approval_status": p.approval_status,
             "created_at": p.created_at.strftime("%d/%m %H:%M") if p.created_at else ""
         } for p in preds
     ]
     db.close()
     return {"history": result}
+
+async def run_delayed_upload(prediction_id: str):
+    db = SessionLocal()
+    pred = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not pred:
+        db.close()
+        return
+        
+    channel_id = pred.channel_id
+    channel = db.query(Channel).filter(Channel.id == channel_id).first()
+    cookies_json = channel.cookies if channel else None
+    db.close()
+    
+    absolute_video_path = os.path.join(director.outputs_dir, f"{prediction_id}_preview.mp4")
+    if not os.path.exists(absolute_video_path):
+        absolute_video_path = os.path.join(director.outputs_dir, f"{prediction_id}.mp4")
+        
+    title = f"Como fazer renda extra com IA"
+    if pred.prompt:
+        title = pred.prompt
+        
+    description = "Vídeo gerado de forma 100% automatizada pelo SniperVideoEngine!"
+    
+    log_application_activity(f"Upload aprovado pelo Jonatas para o vídeo ID: {prediction_id}. Iniciando postagem...")
+    send_telegram_notification(f"🚀 *[Publicação]* Upload do vídeo aprovado. Iniciando Playwright...")
+    
+    channel_uploader = YouTubeUploader(channel_id=channel_id)
+    upload_success = channel_uploader.upload_video(
+        video_path=absolute_video_path,
+        title=title[:90],
+        description=description,
+        is_short=True,
+        cookies_json=cookies_json
+    )
+    
+    if upload_success:
+        log_application_activity(f"Sucesso! Vídeo publicado no YouTube.")
+        send_telegram_notification(f"✅ *[Publicado]* Vídeo `{title[:40]}` postado com sucesso!")
+    else:
+        log_application_activity("Erro: Falha no upload no YouTube Studio.")
+        send_telegram_notification(f"⚠️ *[Aviso]* Falha ao realizar postagem. Cookies expirados ou inválidos.")
+
+@app.post("/api/v1/predictions/{prediction_id}/approve")
+async def approve_prediction(prediction_id: str, background_tasks: BackgroundTasks):
+    db = SessionLocal()
+    pred = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not pred:
+        db.close()
+        raise HTTPException(status_code=404, detail="Geração não encontrada")
+    
+    pred.approval_status = "approved"
+    db.commit()
+    db.close()
+    
+    background_tasks.add_task(run_delayed_upload, prediction_id)
+    return {"message": "Geração aprovada. Upload em segundo plano iniciado."}
+
+@app.post("/api/v1/predictions/{prediction_id}/reject")
+async def reject_prediction(prediction_id: str):
+    db = SessionLocal()
+    pred = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not pred:
+        db.close()
+        raise HTTPException(status_code=404, detail="Geração não encontrada")
+    
+    pred.approval_status = "rejected"
+    db.commit()
+    db.close()
+    
+    log_application_activity(f"Geração {prediction_id} rejeitada pelo Jonatas. Aguardando novos direcionamentos de ajuste.")
+    send_telegram_notification(f"⚠️ *[Curadoria]* Geração `{prediction_id}` rejeitada pelo Jonatas. Ajustes solicitados.")
+    return {"message": "Geração marcada como rejeitada."}
 
 @app.post("/api/v1/hermes/chat")
 async def chat_with_hermes(payload: ChatPayload, background_tasks: BackgroundTasks):
@@ -453,13 +501,13 @@ async def chat_with_hermes(payload: ChatPayload, background_tasks: BackgroundTas
     if any(k in user_msg for k in ["começar", "iniciar", "vamos começar", "go", "start", "produzir"]):
         trigger_production = True
 
-    # Construir instruções do sistema para a persona do Hermes
+    # Construir instruções do sistema para a persona do Hermes com Curadoria Humana
     system_instruction = (
         "Você é o Hermes, o Agente Orquestrador executivo e extremamente inteligente da plataforma DEZAFIRA, a Fábrica de Canais. "
         "Você está conversando diretamente com o JONATAS, o fundador da Holding Dezafira. "
-        "Seu objetivo absoluto é rodar a esteira no modo 100% Autônomo (Mãos Livres), sem precisar calibrar ou fazer perguntas de restrições para o Jonatas. "
-        "Quando o Jonatas mandar iniciar ou começar, confirme que assumirá todo o processo: garimpar a tendência de melhor CPM via Trend Hunter, criar o roteiro otimizado para o YouTube Shorts respeitando 100% as políticas do YouTube (original e autoral), gerar a narração, editar e agendar a postagem no canal dele. "
-        "Mantenha um tom corporativo, direto, altamente capaz e diga a ele que você cuidará de tudo sozinho."
+        "Você deve explicar a ele que a esteira roda no modo de curadoria (Human-in-the-loop): você vai garimpar a tendência de melhor CPM via Trend Hunter, criar o roteiro otimizado para o YouTube Shorts respeitando 100% as políticas, gerar a narração local com OmniVoice e o apresentador digital. "
+        "Porém, após o vídeo ficar pronto, você vai aguardar a aprovação explícita do Jonatas na UI (usando os botões de Aprovar e Rejeitar/Pedir Ajustes) antes de realizar a postagem física no canal dele. "
+        "Se o Jonatas solicitar qualquer ajuste no vídeo rejeitado, confirme que você entenderá o feedback e corrigirá o roteiro/esteira. Mantenha um tom corporativo, extremamente prestativo e focado em monetização."
     )
     
     messages_for_llm = [{"role": "system", "content": system_instruction}] + hermes_chat_history[-10:] # Manter as últimas 10 interações para contexto

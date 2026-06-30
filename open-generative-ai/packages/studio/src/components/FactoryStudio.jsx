@@ -238,6 +238,25 @@ export default function FactoryStudio({ apiKey }) {
     }
   };
 
+  const handleApproveVideo = async (predictionId) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/predictions/${predictionId}/approve`);
+      fetchVideoHistory();
+    } catch (err) {
+      console.error('Erro ao aprovar vídeo:', err);
+    }
+  };
+
+  const handleRejectVideo = async (predictionId) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/predictions/${predictionId}/reject`);
+      fetchVideoHistory();
+      setChatInput('Hermes, refaça o último vídeo alterando o seguinte: ');
+    } catch (err) {
+      console.error('Erro ao rejeitar vídeo:', err);
+    }
+  };
+
   // Rolar chat para o final ao receber novas mensagens
   useEffect(() => {
     if (chatBottomRef.current) {
@@ -893,19 +912,49 @@ export default function FactoryStudio({ apiKey }) {
             <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto custom-scrollbar">
               {videoHistory.length > 0 ? (
                 videoHistory.map((video) => (
-                  <div key={video.id} className="bg-white/5 border border-white/5 hover:border-primary/20 p-2.5 rounded-xl flex items-center justify-between text-xs transition-all group animate-fade-in-up">
-                    <div className="flex flex-col gap-1 flex-1 pr-3">
-                      <span className="font-bold text-white/90 truncate max-w-[210px] group-hover:text-primary transition-colors" title={video.prompt}>
-                        {video.prompt}
-                      </span>
-                      <span className="text-[9px] text-white/30">{video.created_at}</span>
+                  <div key={video.id} className="bg-white/5 border border-white/5 hover:border-primary/20 p-2.5 rounded-xl flex flex-col gap-2 text-xs transition-all group animate-fade-in-up">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-1 flex-1 pr-3">
+                        <span className="font-bold text-white/90 truncate max-w-[210px] group-hover:text-primary transition-colors" title={video.prompt}>
+                          {video.prompt}
+                        </span>
+                        <span className="text-[9px] text-white/30">{video.created_at}</span>
+                      </div>
+                      <button
+                        onClick={() => setVideoUrl(video.video_url)}
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all"
+                      >
+                        Assistir 🎬
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setVideoUrl(video.video_url)}
-                      className="bg-primary/10 hover:bg-primary/30 border border-primary/20 hover:border-primary/40 text-primary text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-[0_0_10px_rgba(30,144,255,0.05)]"
-                    >
-                      Assistir 🎬
-                    </button>
+
+                    {/* Botões de Curadoria (Aprovar / Pedir Ajustes) */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                      {video.approval_status === 'approved' ? (
+                        <span className="text-[9px] font-bold text-primary bg-primary/10 border border-primary/20 rounded px-2.5 py-1 w-full text-center">
+                          ✅ Aprovado & Postado no YouTube
+                        </span>
+                      ) : video.approval_status === 'rejected' ? (
+                        <span className="text-[9px] font-bold text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded px-2.5 py-1 w-full text-center">
+                          ⚠️ Rejeitado (Ajuste Solicitado)
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleApproveVideo(video.id)}
+                            className="flex-1 bg-primary hover:bg-[#1ed760] text-black text-[9px] font-black uppercase py-1.5 rounded-lg transition-all"
+                          >
+                            Aprovar & Postar 🚀
+                          </button>
+                          <button
+                            onClick={() => handleRejectVideo(video.id)}
+                            className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-[9px] font-black uppercase py-1.5 rounded-lg transition-all"
+                          >
+                            Pedir Ajuste ✍️
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (
