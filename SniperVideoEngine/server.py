@@ -259,16 +259,42 @@ async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, bac
     if not payload.cookies_raw and (not payload.email or not payload.password):
         raise HTTPException(status_code=400, detail="Credenciais ou cookies ausentes na requisição.")
 
-    # Se o usuário optou por colar os cookies diretamente, pula o robô de digitação e salva na hora!
+    # Se o usuário optou por colar os cookies diretamente, valida e salva na hora!
     if payload.cookies_raw:
         from modules.database import save_db_channel_cookies
         try:
             cookies_json = payload.cookies_raw.strip()
-            json.loads(cookies_json)
-            success = save_db_channel_cookies(channel_id, cookies_json)
-            if not success:
-                raise HTTPException(status_code=400, detail="Falha ao salvar os cookies de sessão no banco.")
-            return {"message": "Cookies importados e salvos com sucesso!"}
+            # Garante formato JSON válido
+            parsed_cookies = json.loads(cookies_json)
+            
+            # Executa uma verificação rápida de 6 segundos em background/stealth para confirmar se o cookie loga no YT Studio
+            from playwright.sync_api import sync_playwright
+            login_ok = False
+            try:
+                with sync_playwright() as p:
+                    browser = p.chromium.launch(
+                        headless=True,
+                        args=["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox"]
+                    )
+                    context = browser.new_context(
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+                    )
+                    context.add_cookies(parsed_cookies)
+                    page = context.new_page()
+                    page.goto("https://studio.youtube.com", timeout=12000)
+                    page.wait_for_timeout(3000)
+                    # Se não redirecionou para tela de login do Google, o cookie é quente!
+                    if "signin" not in page.url and "login" not in page.url:
+                        login_ok = True
+                    browser.close()
+            except Exception as e:
+                print(f"[Agent-Login] Falha ao testar cookies: {e}")
+                
+            if not login_ok:
+                raise HTTPException(status_code=400, detail="Dispositivo não autenticado. Os cookies colados estão expirados ou são inválidos.")
+
+            save_db_channel_cookies(channel_id, cookies_json)
+            return {"message": "Cookies importados e validados com sucesso!"}
         except Exception as json_err:
             if isinstance(json_err, HTTPException):
                 raise json_err

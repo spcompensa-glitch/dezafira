@@ -106,7 +106,7 @@ export default function FactoryStudio({ apiKey }) {
       return;
     }
     if (loginPollingRef.current) clearInterval(loginPollingRef.current);
-    setLoginStatus('typing_email');
+    setLoginStatus('importing_cookies');
     setLoginError(null);
     try {
       await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/login-stealth`, {
@@ -120,7 +120,7 @@ export default function FactoryStudio({ apiKey }) {
     } catch (err) {
       console.error(err);
       setLoginStatus('failed');
-      setLoginError(err.response?.data?.detail || 'Formato de cookies inválido ou falha ao salvar.');
+      setLoginError(err.response?.data?.detail || 'Os cookies informados são inválidos ou expiraram.');
     }
   };
 
@@ -915,14 +915,26 @@ export default function FactoryStudio({ apiKey }) {
               </div>
             )}
 
-            {(loginStatus === 'typing_email' || loginStatus === 'typing_password') && (
+            {(loginStatus === 'typing_email' || loginStatus === 'typing_password' || loginStatus === 'importing_cookies') && (
               <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
-                <div className="w-10 h-10 border-2 border-red-500/20 border-t-red-500 rounded-full animate-spin"></div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-white">Agente conectando ao Google...</span>
-                  <span className="text-[10px] text-white/40">
-                    {loginStatus === 'typing_email' ? 'Digitando e-mail de acesso...' : 'Digitando credencial de senha...'}
+                <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                <div className="flex flex-col gap-1 w-full">
+                  <span className="text-xs font-bold text-white">
+                    {loginStatus === 'importing_cookies' ? 'Validando Sessão com Robô 🤖' : 'Agente conectando ao Google...'}
                   </span>
+                  <span className="text-[10px] text-white/40">
+                    {loginStatus === 'importing_cookies' 
+                      ? 'Dezafira abrindo o Chrome em background e verificando acesso ao Studio...'
+                      : loginStatus === 'typing_email' ? 'Digitando e-mail de acesso...' : 'Digitando credencial de senha...'}
+                  </span>
+                  {loginStatus === 'importing_cookies' && (
+                    <div className="mt-3 text-left font-mono text-[9px] text-white/30 bg-black/40 border border-white/5 p-3 rounded-lg flex flex-col gap-1">
+                      <div>&gt; Iniciando navegador Chromium Headless...</div>
+                      <div>&gt; Injetando cookies de segurança...</div>
+                      <div>&gt; Carregando studio.youtube.com...</div>
+                      <div className="animate-pulse">&gt; Aguardando resposta do painel...</div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
