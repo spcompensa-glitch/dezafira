@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, DateTime, JSON, ForeignKey
+from sqlalchemy import create_engine, Column, String, DateTime, JSON, ForeignKey, Integer
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # 1. Determinar URL do banco de dados (Railway Postgres ou SQLite local)
