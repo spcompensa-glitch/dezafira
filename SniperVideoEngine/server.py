@@ -42,6 +42,20 @@ app.add_middleware(
 # Dicionário na memória para guardar o status das gerações
 # Removidos channels.json e predictions_db locais. Usando database.py.
 
+# Logs de Atividade em Tempo Real da Esteira
+application_logs = [
+    "[Info] Fábrica de Canais Dezafira inicializada com sucesso.",
+    "[Info] Pronto para iniciar o ciclo autônomo com o Hermes."
+]
+
+def log_application_activity(message: str):
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    log_line = f"[{timestamp}] {message}"
+    application_logs.append(log_line)
+    if len(application_logs) > 60:
+        application_logs.pop(0)
+
 # Histórico de conversa com o Hermes
 hermes_chat_history: List[Dict[str, str]] = [
     {"role": "assistant", "content": "Olá! Eu sou o Hermes, o agente orquestrador da Fábrica de Canais. Como posso te ajudar hoje?"}
@@ -52,6 +66,10 @@ uploader = YouTubeUploader()
 
 # Servir arquivos estáticos de outputs para poder acessar o vídeo final
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+
+@app.get("/api/v1/logs")
+async def get_application_logs():
+    return {"logs": application_logs}
 
 # Helper para chamar LLMs usando Nvidia NIM como primário e DeepSeek como secundário
 async def query_llm(messages: List[Dict[str, str]]) -> str:
@@ -119,21 +137,20 @@ class FactoryPayload(BaseModel):
 async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
     try:
         update_db_prediction(prediction_id, "processing")
+        log_application_activity(f"Iniciando esteira automatizada para o tema: '{payload.prompt}'")
         send_telegram_notification(f"🔍 *[Dezafira]* Iniciando esteira automatizada para o tema: `{payload.prompt}`\n\nGarimpando tendências e estruturando roteiro...")
         
         # 1. Configurar a voz selecionada temporariamente no importador do generator
-        # Se for pt-BR-FranciscaNeural, passamos ela para a produção de locução
         print(f"[API] Iniciando Fábrica para {prediction_id} com voz {payload.voice}")
+        log_application_activity("Garimpando tendências e gerando roteiro autoral...")
         
-        # Ajustamos o SniperDirector para receber o dump e a voz
-        # Gerando o Roteiro, Narração e a Edição Completa com Legendas Dinâmicas
-        # Nota: O SniperDirector chama o orquestrador que por sua vez chama o Whisper
         plan = await director.produce_campaign(
             theme=payload.prompt, 
             brand=payload.brand, 
             project_id=prediction_id
         )
         
+        log_application_activity("Roteiro estruturado. Gerando dublagem OmniVoice e apresentador digital...")
         send_telegram_notification(f"✍️ *[Roteirização & Dublagem]* Roteiro autoral estruturado e locução gerada via OmniVoice!\n\nIniciando renderização do apresentador digital (InfiniteTalk) e montagem final...")
         
         final_video_name = f"{prediction_id}_preview.mp4"
@@ -153,33 +170,35 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
             title = plan.get("title", f"Roteiro Automático: {payload.prompt}")
             description = plan.get("script", "Vídeo gerado de forma 100% automatizada pelo SniperVideoEngine!")
             
-            send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload no YouTube via Playwright simulado...")
-            print(f"[API] Iniciando upload automático do vídeo {prediction_id} via Playwright...")
+            log_application_activity(f"Renderização finalizada. Iniciando upload no canal '{payload.channel_id}' via cookies...")
+            send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Início do upload no YouTube via Playwright simulado...")
+            
             channel_uploader = YouTubeUploader(channel_id=payload.channel_id)
             upload_success = channel_uploader.upload_video(
                 video_path=absolute_video_path,
-                title=title[:90], # Margem de segurança de caracteres do título do YT
+                title=title[:90],
                 description=description,
                 is_short=True,
                 cookies_json=cookies_json
             )
             
             if upload_success:
-                send_telegram_notification(f"✅ *[Publicado!]* O vídeo vertical `{title[:40]}` foi postado e agendado com sucesso no canal!")
-                print(f"[API] Upload do vídeo {prediction_id} concluído com sucesso!")
+                log_application_activity(f"Sucesso! Vídeo publicado: '{title[:45]}...'")
+                send_telegram_notification(f"✅ *[Publicado!]* O vídeo vertical `{title[:40]}` foi postado com sucesso!")
             else:
-                send_telegram_notification(f"⚠️ *[Aviso]* Vídeo gerado com sucesso, mas ocorreu uma falha no upload do YouTube.")
-                print(f"[API] ⚠️ Falha ao fazer upload do vídeo {prediction_id}.")
+                log_application_activity("Aviso: Falha ao publicar no YouTube Studio. Cookies podem ter expirado.")
+                send_telegram_notification(f"⚠️ *[Aviso]* Vídeo gerado com sucesso, mas falhou no upload do YouTube.")
         else:
+            log_application_activity("Geração concluída! Upload pulado (post_to_youtube = False).")
             send_telegram_notification(f"🎬 *[Esteira Concluída]* Geração finalizada! Vídeo pronto para visualização local.")
         
         update_db_prediction(prediction_id, "completed", video_url=final_video_path)
-        print(f"[API] Geração {prediction_id} finalizada com sucesso!")
+        log_application_activity(f"Esteira do ciclo concluída com sucesso para o ID: {prediction_id}!")
         
     except Exception as e:
         update_db_prediction(prediction_id, "failed", error=str(e))
+        log_application_activity(f"Erro na esteira: {str(e)}")
         send_telegram_notification(f"❌ *[Falha]* Erro ao produzir vídeo para `{payload.prompt}`: {str(e)}")
-        print(f"[API] Erro na geração {prediction_id}: {str(e)}")
 
 @app.post("/api/v1/predictions")
 async def create_prediction(payload: Dict[str, Any], background_tasks: BackgroundTasks):

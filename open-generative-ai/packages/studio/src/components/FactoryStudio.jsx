@@ -44,6 +44,8 @@ export default function FactoryStudio({ apiKey }) {
   const [selectedChannel, setSelectedChannel] = useState('default');
   const [frequency, setFrequency] = useState('daily');
   const [isAutopilot, setIsAutopilot] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [activeVideoTab, setActiveVideoTab] = useState('shorts');
 
   // Estados de Login Stealth do Agente (Dezafira)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -206,10 +208,22 @@ export default function FactoryStudio({ apiKey }) {
     fetchChannels();
     fetchHermesHistory();
     fetchTrends('Dropshipping');
+    fetchLogs();
+    const logsInterval = setInterval(fetchLogs, 2500);
     return () => {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+      clearInterval(logsInterval);
     };
   }, []);
+
+  const fetchLogs = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/logs`);
+      setLogs(res.data.logs || []);
+    } catch (err) {
+      console.error('Erro ao buscar logs:', err);
+    }
+  };
 
   // Rolar chat para o final ao receber novas mensagens
   useEffect(() => {
@@ -540,6 +554,23 @@ export default function FactoryStudio({ apiKey }) {
               )}
             </div>
           </div>
+
+          {/* Console de Logs de Operação */}
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex-1 flex flex-col overflow-hidden min-h-[220px] luxury-card">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              <span>📂 Dezafira Console (Logs)</span>
+            </h3>
+            <div className="flex-1 overflow-y-auto custom-scrollbar my-3 font-mono text-[10px] text-emerald-400 bg-black/40 p-3 rounded-xl flex flex-col gap-1.5 min-h-[140px]">
+              {logs.length > 0 ? (
+                logs.map((logLine, idx) => (
+                  <div key={idx} className="leading-relaxed border-b border-white/[0.02] pb-1">&gt; {logLine}</div>
+                ))
+              ) : (
+                <div className="text-white/30 text-center py-8">Aguardando logs da esteira...</div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* COLUNA 2: Fábrica Autônoma de Canais (Criação de Canais por IA) */}
@@ -783,25 +814,57 @@ export default function FactoryStudio({ apiKey }) {
             </div>
           </div>
 
-          {/* Vídeo Gerado & Status de SEO */}
+          {/* Vídeo Gerado & Visualizador Avançado */}
           <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex-1 flex flex-col gap-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2">🎬 Último Vídeo Renderizado</h3>
-            
-            <div className="w-full aspect-[9/16] max-h-[300px] bg-black/40 border border-white/5 rounded-xl flex items-center justify-center relative overflow-hidden">
+            <div className="flex flex-col gap-2 border-b border-white/5 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white/80">🎬 Visualizador de Conteúdo</h3>
+              {/* Abas Diamante */}
+              <div className="flex bg-black/40 border border-white/5 p-1 rounded-xl">
+                <button
+                  onClick={() => setActiveVideoTab('shorts')}
+                  className={`flex-1 text-[10px] font-bold py-1.5 rounded-lg transition-all ${
+                    activeVideoTab === 'shorts' ? 'bg-primary text-black' : 'text-white/40 hover:text-white'
+                  }`}
+                >
+                  Shorts (9:16)
+                </button>
+                <button
+                  onClick={() => setActiveVideoTab('horizontal')}
+                  className={`flex-1 text-[10px] font-bold py-1.5 rounded-lg transition-all ${
+                    activeVideoTab === 'horizontal' ? 'bg-primary text-black' : 'text-white/40 hover:text-white'
+                  }`}
+                >
+                  Horizontal (16:9)
+                </button>
+              </div>
+            </div>
+
+            <div className={`w-full bg-black/40 border border-white/5 rounded-xl flex items-center justify-center relative overflow-hidden transition-all duration-300 ${
+              activeVideoTab === 'shorts' ? 'aspect-[9/16] max-h-[320px]' : 'aspect-[16/9] max-h-[220px]'
+            }`}>
               {videoUrl ? (
-                <video
-                  src={videoUrl}
-                  className="w-full h-full object-cover"
-                  controls
-                  autoPlay
-                />
+                activeVideoTab === 'shorts' ? (
+                  <video
+                    src={videoUrl}
+                    className="w-full h-full object-cover"
+                    controls
+                    autoPlay
+                  />
+                ) : (
+                  <video
+                    src={videoUrl}
+                    className="w-full h-full object-contain"
+                    controls
+                    autoPlay
+                  />
+                )
               ) : (
                 <div className="flex flex-col items-center gap-3 text-white/30 text-xs font-bold uppercase tracking-widest p-4 text-center">
                   <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-30">
                     <rect x="2" y="2" width="20" height="20" rx="4"/>
                     <path d="M12 18V6l-5 4 5-4 5 4"/>
                   </svg>
-                  <span>{isProcessing ? 'Renderizando corte...' : 'Aguardando Geração'}</span>
+                  <span>{isProcessing ? 'Renderizando formato...' : 'Aguardando Geração'}</span>
                 </div>
               )}
             </div>
