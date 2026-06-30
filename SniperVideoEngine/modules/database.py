@@ -86,54 +86,8 @@ def get_db_channels():
     try:
         channels = db.query(Channel).all()
         # Se o banco estiver vazio, cria as contas Google e canais criados por IA de teste iniciais
-        if not channels:
-            initial_channels = [
-                Channel(id="ch_1", name="jonatas.canais@gmail.com", nicho="Geral", lang="PT", status="active", monetization_step="publishing"),
-                Channel(id="ch_2", name="dezafira.global@gmail.com", nicho="Geral", lang="EN", status="active", monetization_step="setup")
-            ]
-            for c in initial_channels:
-                db.add(c)
-            db.commit()
-            
-            # Adiciona os subcanais de teste criados por IA
-            initial_ai_channels = [
-                AiCreatedChannel(
-                    id="sub_1",
-                    channel_id="ch_1",
-                    name="Dropshipping Prático",
-                    nicho="Dropshipping",
-                    lang="PT",
-                    creation_reason=(
-                        "### 📊 Relatório Estratégico de Criação — Dropshipping Prático\n\n"
-                        "Este canal foi criado autonomamente pela Dezafira após identificar que o volume de pesquisas por "
-                        "**'Dropshipping sem estoque com Inteligência Artificial'** cresceu **240%** no Brasil na última semana de junho de 2026.\n\n"
-                        "**Oportunidade**: A concorrência para este termo específico em formato vertical (YouTube Shorts) é classificada como **Baixa**, "
-                        "garantindo um carregamento rápido de impressões orgânicas e atração acelerada de público qualificado."
-                    ),
-                    subscribers=1420,
-                    videos_posted=18
-                ),
-                AiCreatedChannel(
-                    id="sub_2",
-                    channel_id="ch_1",
-                    name="Global Tech Trends",
-                    nicho="Tech",
-                    lang="EN",
-                    creation_reason=(
-                        "### 📊 Relatório Estratégico de Criação — Global Tech Trends\n\n"
-                        "Decisão baseada no tráfego massivo global de pesquisas voltadas para os novos chips neuromórficos e avanço de "
-                        "desenvolvimento de robótica humanóide em mercados norte-americanos.\n\n"
-                        "**Oportunidade**: Audiência internacional altamente monetizada por RPM elevado em tecnologia."
-                    ),
-                    subscribers=540,
-                    videos_posted=12
-                )
-            ]
-            for ac in initial_ai_channels:
-                db.add(ac)
-            db.commit()
-            
-            channels = db.query(Channel).all()
+        # Banco limpo
+        pass
             
         return [
             {
@@ -194,11 +148,20 @@ def create_db_channel(name: str, nicho: str, lang: str):
 def delete_db_channel(channel_id: str) -> bool:
     db = SessionLocal()
     try:
+        # Remover subcanais da IA em cascata
+        db.query(AiCreatedChannel).filter(AiCreatedChannel.channel_id == channel_id).delete(synchronize_session=False)
+        # Remover predições
+        db.query(Prediction).filter(Prediction.channel_id == channel_id).delete(synchronize_session=False)
+        
         chan = db.query(Channel).filter(Channel.id == channel_id).first()
         if chan:
             db.delete(chan)
             db.commit()
             return True
+        return False
+    except Exception as e:
+        print(f"[Database] Erro ao deletar em cascata: {e}")
+        db.rollback()
         return False
     finally:
         db.close()
