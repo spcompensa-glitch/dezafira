@@ -47,8 +47,10 @@ export default function FactoryStudio({ apiKey }) {
 
   // Estados de Login Stealth do Agente (Dezafira)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginMethod, setLoginMethod] = useState('cookies'); // 'cookies' ou 'credentials'
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginCookiesRaw, setLoginCookiesRaw] = useState('');
   const [loginVerificationCode, setLoginVerificationCode] = useState('');
   const [loginStatus, setLoginStatus] = useState('idle'); // idle, typing_email, typing_password, awaiting_2fa, connected, failed
   const [loginError, setLoginError] = useState(null);
@@ -66,8 +68,10 @@ export default function FactoryStudio({ apiKey }) {
     }
     setLoginEmail('');
     setLoginPassword('');
+    setLoginCookiesRaw('');
     setLoginVerificationCode('');
     setLoginStatus('idle');
+    setLoginMethod('cookies');
     setLoginError(null);
     setIsLoginModalOpen(true);
   };
@@ -92,6 +96,30 @@ export default function FactoryStudio({ apiKey }) {
       console.error(err);
       setLoginStatus('failed');
       setLoginError('Falha ao iniciar o agente de login. Verifique se o backend está ativo.');
+    }
+  };
+
+  const handleImportCookies = async (e) => {
+    e.preventDefault();
+    if (!loginCookiesRaw.trim()) {
+      alert('Por favor, cole o JSON de cookies extraído do YouTube.');
+      return;
+    }
+    setLoginStatus('typing_email');
+    setLoginError(null);
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/login-stealth`, {
+        cookies_raw: loginCookiesRaw
+      });
+      setLoginStatus('connected');
+      fetchChannels();
+      setTimeout(() => {
+        setIsLoginModalOpen(false);
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+      setLoginStatus('failed');
+      setLoginError(err.response?.data?.detail || 'Formato de cookies inválido ou falha ao salvar.');
     }
   };
 
@@ -797,43 +825,93 @@ export default function FactoryStudio({ apiKey }) {
             </button>
 
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-bold text-white">Vincular Canal 🔑</h2>
-              <p className="text-[10px] text-white/50">Login direto e seguro por agente de simulação.</p>
+              <h2 className="text-lg font-bold text-white">Vincular Conta Google 🔑</h2>
+              <p className="text-[10px] text-white/50">Ative o acesso seguro de postagem no YouTube.</p>
             </div>
 
             {loginStatus === 'idle' && (
-              <form onSubmit={handleStartStealthLogin} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">E-mail do Google</label>
-                  <input 
-                    type="email" 
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    required
-                    className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500/50"
-                    placeholder="exemplo@gmail.com"
-                  />
+              <div className="flex flex-col gap-4">
+                {/* Abas */}
+                <div className="flex bg-black/40 border border-white/5 p-1 rounded-xl">
+                  <button
+                    onClick={() => setLoginMethod('cookies')}
+                    className={`flex-1 text-[10px] font-bold py-2 rounded-lg transition-all ${
+                      loginMethod === 'cookies' ? 'bg-primary text-black' : 'text-white/40 hover:text-white'
+                    }`}
+                  >
+                    Importar Cookies ⚡
+                  </button>
+                  <button
+                    onClick={() => setLoginMethod('credentials')}
+                    className={`flex-1 text-[10px] font-bold py-2 rounded-lg transition-all ${
+                      loginMethod === 'credentials' ? 'bg-primary text-black' : 'text-white/40 hover:text-white'
+                    }`}
+                  >
+                    Digitar E-mail/Senha
+                  </button>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Senha do Google</label>
-                  <input 
-                    type="password" 
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                    className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500/50"
-                    placeholder="Sua senha"
-                  />
-                </div>
+                {loginMethod === 'cookies' ? (
+                  <form onSubmit={handleImportCookies} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Colar Cookies (JSON)</label>
+                        <span className="text-[8px] text-primary/70 font-semibold">100% de Sucesso na Nuvem</span>
+                      </div>
+                      <textarea
+                        value={loginCookiesRaw}
+                        onChange={(e) => setLoginCookiesRaw(e.target.value)}
+                        required
+                        rows="5"
+                        placeholder='[{"name": "SID", "value": "xxxx", "domain": ".youtube.com"}, ...]'
+                        className="bg-black border border-white/10 rounded-xl p-3 text-[10px] font-mono text-white focus:outline-none focus:border-primary/50 custom-scrollbar"
+                      />
+                    </div>
+                    <div className="text-[9px] text-white/40 leading-relaxed bg-white/[0.02] border border-white/5 p-3 rounded-xl">
+                      💡 <strong>Dica</strong>: Acesse o YouTube Studio, clique em uma extensão como a <em>EditThisCookie</em> ou <em>Get cookies.txt</em> no seu Chrome, exporte os cookies em formato JSON e cole-os no campo acima!
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-primary hover:bg-[#1ed760] text-black text-xs font-bold p-3 rounded-xl transition-all shadow-lg shadow-primary/10"
+                    >
+                      Importar Cookies
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleStartStealthLogin} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">E-mail do Google</label>
+                      <input
+                        type="email"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        required
+                        className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500/50"
+                        placeholder="exemplo@gmail.com"
+                      />
+                    </div>
 
-                <button 
-                  type="submit"
-                  className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold p-3 rounded-xl transition-all shadow-lg shadow-red-600/10"
-                >
-                  Conectar Canal
-                </button>
-              </form>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Senha do Google</label>
+                      <input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        required
+                        className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500/50"
+                        placeholder="Sua senha"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold p-3 rounded-xl transition-all shadow-lg shadow-red-600/10"
+                    >
+                      Conectar Conta
+                    </button>
+                  </form>
+                )}
+              </div>
             )}
 
             {(loginStatus === 'typing_email' || loginStatus === 'typing_password') && (

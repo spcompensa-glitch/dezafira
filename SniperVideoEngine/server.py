@@ -243,11 +243,23 @@ async def delete_channel(channel_id: str):
     return {"message": "Canal removido com sucesso"}
 
 class LoginStealthPayload(BaseModel):
-    email: str
-    password: str
+    email: Optional[str] = None
+    password: Optional[str] = None
+    cookies_raw: Optional[str] = None
 
 @app.post("/api/v1/channels/{channel_id}/login-stealth")
 async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, background_tasks: BackgroundTasks):
+    # Se o usuário optou por colar os cookies diretamente, pula o robô de digitação e salva na hora!
+    if payload.cookies_raw:
+        from modules.database import save_db_channel_cookies
+        try:
+            cookies_json = payload.cookies_raw.strip()
+            json.loads(cookies_json)
+            save_db_channel_cookies(channel_id, cookies_json)
+            return {"message": "Cookies importados e salvos com sucesso!"}
+        except Exception as json_err:
+            raise HTTPException(status_code=400, detail=f"Formato de cookies inválido. Cole um JSON válido: {str(json_err)}")
+
     from modules.agent_login import run_agent_login_stealth
     
     # Reseta estados anteriores
