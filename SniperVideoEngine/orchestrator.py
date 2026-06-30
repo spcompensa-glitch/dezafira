@@ -1,6 +1,9 @@
 import os
 import whisper_timestamped as whisper
-from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
+try:
+    from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
+except ImportError:
+    from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
 
 def transcribe_audio_to_words(audio_path):
     """
