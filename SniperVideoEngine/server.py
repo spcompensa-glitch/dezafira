@@ -379,6 +379,14 @@ async def chat_with_hermes(payload: ChatPayload):
 async def get_hermes_history():
     return {"history": hermes_chat_history}
 
+@app.post("/api/v1/hermes/clear")
+async def clear_hermes_chat():
+    global hermes_chat_history
+    hermes_chat_history = [
+        {"role": "assistant", "content": "Olá! Eu sou o Hermes, o agente orquestrador da Fábrica de Canais. Como posso te ajudar hoje?"}
+    ]
+    return {"message": "Chat reiniciado com sucesso.", "history": hermes_chat_history}
+
 trend_hunter = DezafiraTrendHunter()
 
 @app.get("/api/v1/trends")

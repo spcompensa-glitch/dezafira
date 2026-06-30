@@ -274,6 +274,17 @@ export default function FactoryStudio({ apiKey }) {
     }
   };
 
+  const handleClearChat = async () => {
+    if (!confirm('Deseja iniciar uma nova conversa e limpar o histórico do Hermes?')) return;
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/v1/hermes/clear`);
+      setChatMessages(res.data.history);
+    } catch (err) {
+      console.error(err);
+      alert('Falha ao reiniciar conversa.');
+    }
+  };
+
   const pollResult = (predictionId) => {
     const url = `${API_BASE_URL}/api/v1/predictions/${predictionId}/result`;
     
@@ -340,6 +351,55 @@ export default function FactoryStudio({ apiKey }) {
 
   return (
     <div className="w-full h-full flex flex-col bg-app-bg text-white overflow-hidden p-6 md:p-8">
+      <style>{`
+        @keyframes rotate-border {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .luxury-card {
+          position: relative;
+          background: rgba(10, 10, 10, 0.85) !important;
+          border: 1px solid rgba(255, 255, 255, 0.05) !important;
+          backdrop-filter: blur(16px);
+          transition: all 0.3s ease;
+        }
+        .luxury-card:hover {
+          border-color: rgba(30, 144, 255, 0.2) !important;
+          box-shadow: 0 0 25px rgba(30, 144, 255, 0.1) !important;
+        }
+        .diamond-border-anim {
+          position: relative;
+          border: 1px solid transparent !important;
+          background-image: linear-gradient(rgba(12, 12, 12, 0.95), rgba(12, 12, 12, 0.95)), 
+                            linear-gradient(90deg, #00f2fe, #4facfe, #0000ff, #00f2fe);
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
+          background-size: 300% 300%;
+          animation: rotate-border 8s infinite linear;
+        }
+        .zafira-text {
+          background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #8b5cf6 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          text-shadow: 0 0 25px rgba(79, 172, 254, 0.2);
+        }
+        .chat-bubble-user {
+          background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%) !important;
+          color: #000000 !important;
+          font-weight: 600;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 99px;
+        }
+      `}</style>
       {/* Title / Banner Executivo Dezafira */}
       <div className="w-full mb-6 bg-gradient-to-r from-primary/10 via-purple-500/5 to-transparent border border-white/5 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
         <div className="absolute right-6 top-6 opacity-5 animate-pulse">
@@ -506,11 +566,30 @@ export default function FactoryStudio({ apiKey }) {
           </div>
 
           {/* Chat do Hermes (NVIDIA NIM) */}
-          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex-1 flex flex-col overflow-hidden min-h-[250px]">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2 flex items-center justify-between">
-              <span>💬 Conversar com Hermes</span>
-              <span className="text-[9px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">Nvidia NIM API</span>
-            </h3>
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex-1 flex flex-col overflow-hidden min-h-[280px]">
+            <div className="flex flex-col gap-2 border-b border-white/5 pb-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white/80">💬 Conversar com Hermes</h3>
+                <span className="text-[9px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">Nvidia NIM API</span>
+              </div>
+              {/* Botões de Conversa */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleClearChat}
+                  className="flex-1 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-white/70 hover:text-red-400 text-[9px] font-bold py-1 rounded-lg transition-all"
+                  title="Iniciar nova conversa do zero"
+                >
+                  🧹 Iniciar Nova Conversa
+                </button>
+                <button
+                  onClick={fetchHermesHistory}
+                  className="flex-1 bg-white/5 hover:bg-primary/10 border border-white/10 hover:border-primary/20 text-white/70 hover:text-primary text-[9px] font-bold py-1 rounded-lg transition-all"
+                  title="Sincronizar histórico salvo"
+                >
+                  📂 Conversas Anteriores
+                </button>
+              </div>
+            </div>
             
             {/* Corpo das Mensagens */}
             <div className="flex-1 overflow-y-auto custom-scrollbar my-3 space-y-3 pr-1 text-xs">
@@ -518,7 +597,7 @@ export default function FactoryStudio({ apiKey }) {
                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[85%] p-3 rounded-2xl ${
                     msg.role === 'user' 
-                      ? 'bg-primary text-black rounded-tr-none font-semibold' 
+                      ? 'chat-bubble-user rounded-tr-none' 
                       : 'bg-white/5 text-white/80 rounded-tl-none border border-white/5'
                   }`}>
                     {msg.content}
@@ -562,36 +641,37 @@ export default function FactoryStudio({ apiKey }) {
         </div>
 
         {/* COLUNA 3: Galeria & Auto-SEO */}
+        {/* COLUNA 3: Galeria & Auto-SEO */}
         <div className="flex flex-col gap-6 lg:h-full lg:overflow-y-auto custom-scrollbar pr-0 lg:pr-2">
           {/* Configuração Rápida & Lançamento */}
-          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2">✍️ Gestão & Disparo</h3>
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 luxury-card diamond-border-anim">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white/80 border-b border-white/5 pb-2 zafira-text">✍️ Gestão & Disparo</h3>
             
             <div className="flex flex-col gap-3.5">
-              {/* Seleção do Canal e Conexão */}
+              {/* Seleção de Conta Google e Conexão */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Canal de Destino</label>
+                <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Conta Google Mãe</label>
                 <div className="flex gap-2">
                   <select
                     value={selectedChannel}
                     onChange={(e) => setSelectedChannel(e.target.value)}
-                    className="flex-1 bg-[#0c0c0c] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                    className="flex-1 bg-[#0c0c0c] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-primary/50"
                     disabled={isProcessing}
                   >
-                    <option value="default">Canal Padrão (Default)</option>
+                    <option value="default">Selecione a Conta Google...</option>
                     {channels.map((chan) => (
                       <option key={chan.id} value={chan.id}>
-                        {chan.name} ({chan.lang})
+                        {chan.name}
                       </option>
                     ))}
                   </select>
                   <button
                     onClick={handleConnectYouTube}
                     disabled={isProcessing}
-                    className="bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-[10px] font-bold px-3 rounded-xl transition-all"
-                    title="Conectar canal logando no YouTube Studio"
+                    className="bg-primary/15 hover:bg-primary/30 border border-primary/30 text-primary text-[10px] font-bold px-3 rounded-xl transition-all shadow-[0_0_10px_rgba(30,144,255,0.15)]"
+                    title="Iniciar login interativo com o agente"
                   >
-                    Conectar 🔑
+                    Vincular 🔑
                   </button>
                 </div>
               </div>
