@@ -20,6 +20,7 @@ from modules.database import (
     update_db_prediction, 
     get_db_prediction
 )
+from modules.telegram_bot import init_telegram_bot, send_telegram_notification
 
 app = FastAPI(title="F.Video & Open-Generative-AI Integration API")
 
@@ -112,6 +113,7 @@ class FactoryPayload(BaseModel):
 async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
     try:
         update_db_prediction(prediction_id, "processing")
+        send_telegram_notification(f"🔍 *[Dezafira]* Iniciando esteira automatizada para o tema: `{payload.prompt}`\n\nGarimpando tendências e estruturando roteiro...")
         
         # 1. Configurar a voz selecionada temporariamente no importador do generator
         # Se for pt-BR-FranciscaNeural, passamos ela para a produção de locução
@@ -126,6 +128,8 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
             project_id=prediction_id
         )
         
+        send_telegram_notification(f"✍️ *[Roteirização & Dublagem]* Roteiro autoral estruturado e locução gerada via OmniVoice!\n\nIniciando renderização do apresentador digital (InfiniteTalk) e montagem final...")
+        
         final_video_name = f"{prediction_id}_preview.mp4"
         final_video_path = f"/outputs/{final_video_name}"
         absolute_video_path = os.path.join(director.outputs_dir, final_video_name)
@@ -133,6 +137,7 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
         # 2. Upload automático no YouTube Studio se marcado
         if payload.post_to_youtube:
             update_db_prediction(prediction_id, "uploading")
+            send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload seguro do vídeo no YouTube Studio...")
             print(f"[API] Iniciando upload automático do vídeo {prediction_id} no YouTube...")
             
             # Instancia o uploader dinamicamente com o ID do canal para isolar a sessão
@@ -148,15 +153,20 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
             )
             
             if upload_success:
+                send_telegram_notification(f"✅ *[Publicado!]* O vídeo vertical `{title[:40]}` foi postado e agendado com sucesso no canal!")
                 print(f"[API] Upload do vídeo {prediction_id} concluído com sucesso!")
             else:
+                send_telegram_notification(f"⚠️ *[Aviso]* Vídeo gerado com sucesso, mas ocorreu uma falha no upload automático do YouTube Studio.")
                 print(f"[API] ⚠️ Falha ao fazer upload do vídeo {prediction_id}.")
+        else:
+            send_telegram_notification(f"🎬 *[Esteira Concluída]* Geração finalizada! Vídeo pronto para visualização local.")
         
         update_db_prediction(prediction_id, "completed", video_url=final_video_path)
         print(f"[API] Geração {prediction_id} finalizada com sucesso!")
         
     except Exception as e:
         update_db_prediction(prediction_id, "failed", error=str(e))
+        send_telegram_notification(f"❌ *[Falha]* Erro ao produzir vídeo para `{payload.prompt}`: {str(e)}")
         print(f"[API] Erro na geração {prediction_id}: {str(e)}")
 
 @app.post("/api/v1/predictions")
@@ -329,6 +339,55 @@ async def get_niche_trends(query: Optional[str] = "Dropshipping"):
 @app.get("/api/v1/account/balance")
 async def get_balance():
     return {"balance": 9999.0}
+
+@app.on_event("startup")
+async def startup_event():
+    import asyncio
+    
+    # Callback para responder o chat do bot usando o Llama 3.3
+    def on_telegram_chat(message_text):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # Reutiliza a mesma instrução e histórico do Hermes
+            hermes_chat_history.append({"role": "user", "content": message_text})
+            system_instruction = (
+                "Você é o Hermes, o Agente Orquestrador executivo e extremamente inteligente da plataforma DEZAFIRA, a Fábrica de Canais. "
+                "Você está conversando diretamente com o JONATAS, o fundador da Holding Dezafira. "
+                "Seu objetivo absoluto é rodar a esteira no modo 100% Autônomo (Mãos Livres), sem precisar calibrar ou fazer perguntas de restrições para o Jonatas. "
+                "Responda de forma direta, clara e executiva."
+            )
+            messages_for_llm = [{"role": "system", "content": system_instruction}] + hermes_chat_history[-10:]
+            reply = loop.run_until_complete(query_llm(messages_for_llm))
+            hermes_chat_history.append({"role": "assistant", "content": reply})
+            return reply
+        except Exception as e:
+            return f"⚠️ Erro ao processar IA do Hermes: {str(e)}"
+        finally:
+            loop.close()
+
+    # Callback para o comando /produzir [tema]
+    def on_telegram_produce(theme_text):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            factory_payload = FactoryPayload(
+                prompt=theme_text,
+                dump="",
+                brand="Geral",
+                voice="pt-BR-AntonioNeural",
+                post_to_youtube=True,
+                channel_id="default"
+            )
+            prediction_id = f"tele_{uuid.uuid4().hex[:8]}"
+            save_db_prediction(prediction_id, theme_text, "default")
+            loop.run_until_complete(run_factory_pipeline(prediction_id, factory_payload))
+        except Exception as e:
+            print(f"[Telegram Bot] Falha na esteira disparada por chat: {str(e)}")
+        finally:
+            loop.close()
+
+    init_telegram_bot(on_telegram_chat, on_telegram_produce)
 
 if __name__ == "__main__":
     import uvicorn

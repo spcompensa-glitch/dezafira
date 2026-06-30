@@ -12,5 +12,7 @@ requests==2.31.0
 websocket-client==1.7.0
 whisper-timestamped==1.14.4
 moviepy==1.0.3
+pyTelegramBotAPI==4.18.0
+
 
 
