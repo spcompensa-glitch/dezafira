@@ -46,13 +46,18 @@ export default function FactoryStudio({ apiKey }) {
   const [isAutopilot, setIsAutopilot] = useState(false);
 
   const handleConnectYouTube = async () => {
-    setStatus('Abrindo navegador do YouTube Studio na sua máquina...');
+    setStatus('Iniciando conexão segura com o Google OAuth...');
     try {
-      await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/connect`);
-      alert('Navegador de Login aberto! Realize o login no YouTube Studio na janela que apareceu e a sessão será salva automaticamente.');
+      const res = await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/connect`);
+      if (res.data.auth_url) {
+        window.open(res.data.auth_url, '_blank');
+        setStatus('Aguardando vinculação do canal na nova aba...');
+      } else {
+        alert('Navegador de Login aberto localmente! Realize o login no Chrome.');
+      }
     } catch (err) {
       console.error(err);
-      alert('Falha ao iniciar navegador do YouTube. Verifique se o backend está ativo.');
+      alert('Falha ao conectar com o Google OAuth. Verifique se o backend dezafira está ativo.');
     } finally {
       setStatus('Pronto para iniciar.');
     }

@@ -4,6 +4,7 @@ import uuid
 import json
 import httpx
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -18,7 +19,9 @@ from modules.database import (
     delete_db_channel, 
     save_db_prediction, 
     update_db_prediction, 
-    get_db_prediction
+    get_db_prediction,
+    Channel,
+    SessionLocal
 )
 from modules.telegram_bot import init_telegram_bot, send_telegram_notification
 
@@ -134,29 +137,45 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
         final_video_path = f"/outputs/{final_video_name}"
         absolute_video_path = os.path.join(director.outputs_dir, final_video_name)
         
+        # Obter refresh token do canal se houver
+        db_sess = SessionLocal()
+        channel = db_sess.query(Channel).filter(Channel.id == payload.channel_id).first()
+        refresh_token = channel.youtube_refresh_token if channel else None
+        db_sess.close()
+
         # 2. Upload automático no YouTube Studio se marcado
         if payload.post_to_youtube:
             update_db_prediction(prediction_id, "uploading")
-            send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload seguro do vídeo no YouTube Studio...")
-            print(f"[API] Iniciando upload automático do vídeo {prediction_id} no YouTube...")
             
-            # Instancia o uploader dinamicamente com o ID do canal para isolar a sessão
             title = plan.get("title", f"Roteiro Automático: {payload.prompt}")
             description = plan.get("script", "Vídeo gerado de forma 100% automatizada pelo SniperVideoEngine!")
             
-            channel_uploader = YouTubeUploader(channel_id=payload.channel_id)
-            upload_success = channel_uploader.upload_video(
-                video_path=absolute_video_path,
-                title=title[:90], # Margem de segurança de caracteres do título do YT
-                description=description,
-                is_short=True
-            )
+            if refresh_token:
+                send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload via API oficial do YouTube...")
+                print(f"[API] Iniciando upload automático do vídeo {prediction_id} via YouTube API...")
+                from modules.youtube_api_uploader import YouTubeApiUploader
+                api_uploader = YouTubeApiUploader(refresh_token)
+                upload_success = api_uploader.upload_video(
+                    video_path=absolute_video_path,
+                    title=title,
+                    description=description
+                )
+            else:
+                send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload via Playwright (navegador virtual)...")
+                print(f"[API] Iniciando upload automático do vídeo {prediction_id} via Playwright...")
+                channel_uploader = YouTubeUploader(channel_id=payload.channel_id)
+                upload_success = channel_uploader.upload_video(
+                    video_path=absolute_video_path,
+                    title=title[:90], # Margem de segurança de caracteres do título do YT
+                    description=description,
+                    is_short=True
+                )
             
             if upload_success:
                 send_telegram_notification(f"✅ *[Publicado!]* O vídeo vertical `{title[:40]}` foi postado e agendado com sucesso no canal!")
                 print(f"[API] Upload do vídeo {prediction_id} concluído com sucesso!")
             else:
-                send_telegram_notification(f"⚠️ *[Aviso]* Vídeo gerado com sucesso, mas ocorreu uma falha no upload automático do YouTube Studio.")
+                send_telegram_notification(f"⚠️ *[Aviso]* Vídeo gerado com sucesso, mas ocorreu uma falha no upload do YouTube.")
                 print(f"[API] ⚠️ Falha ao fazer upload do vídeo {prediction_id}.")
         else:
             send_telegram_notification(f"🎬 *[Esteira Concluída]* Geração finalizada! Vídeo pronto para visualização local.")
@@ -231,47 +250,114 @@ async def delete_channel(channel_id: str):
     return {"message": "Canal removido com sucesso"}
 
 @app.post("/api/v1/channels/{channel_id}/connect")
-async def connect_channel_session(channel_id: str, background_tasks: BackgroundTasks):
-    import time
-    def open_login_window():
-        from playwright.sync_api import sync_playwright
-        import os
-        project_dir = os.path.dirname(os.path.abspath(__file__))
-        user_data_dir = os.path.join(project_dir, "temp", f"session_{channel_id}")
-        os.makedirs(user_data_dir, exist_ok=True)
+async def connect_channel_session(channel_id: str):
+    # Retorna o link de login do OAuth dezafira
+    # O frontend Next.js lerá esse link e abrirá em uma nova aba
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    if not google_client_id:
+        # Se as credenciais do Google OAuth não existirem nas variáveis, cai para o aviso de uploader local
+        return {
+            "message": "Navegador de Login aberto localmente.", 
+            "auth_url": None
+        }
         
-        with sync_playwright() as p:
-            print(f"[Dezafira-Login] Abrindo painel de autenticação do YouTube Studio para o canal: {channel_id}")
-            browser = p.chromium.launch_persistent_context(
-                user_data_dir=user_data_dir,
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--start-maximized"],
-                no_viewport=True
-            )
-            page = browser.pages[0] if browser.pages else browser.new_page()
-            page.goto("https://studio.youtube.com")
-            
-            # Aguarda o usuário fazer login. Mantém o navegador aberto por até 5 minutos (300 segundos).
-            # Se o usuário fechar o navegador antes, a execução termina de forma limpa.
-            for _ in range(60):
-                if browser.is_connected() == False:
-                    break
-                # Se detectar o seletor de painel do YouTube Studio, o login foi um sucesso
-                try:
-                    if page.locator("a#logo").is_visible():
-                        print("[Dezafira-Login] Login de canal detectado com sucesso!")
-                        break
-                except:
-                    pass
-                time.sleep(5)
-            
-            # Garantir fechamento de navegador e persistência
-            browser.close()
-            print(f"[Dezafira-Login] Sessão de login do canal {channel_id} fechada e salva.")
+    auth_url = f"https://backend-production-fc8b.up.railway.app/api/v1/auth/google/login?channel_id={channel_id}"
+    return {
+        "message": "Link de login OAuth gerado com sucesso.",
+        "auth_url": auth_url
+    }
 
-    # Dispara a abertura do navegador em background para liberar o HTTP imediatamente
-    background_tasks.add_task(open_login_window)
-    return {"message": "Navegador de Login iniciado em background. Faça login na janela aberta."}
+@app.get("/api/v1/auth/google/login")
+async def google_login(channel_id: str):
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    if not google_client_id:
+        raise HTTPException(status_code=400, detail="Google OAuth não configurado no servidor (GOOGLE_CLIENT_ID ausente)")
+        
+    actual_redirect = "https://backend-production-fc8b.up.railway.app/api/v1/auth/google/callback"
+    auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+        "response_type=code&"
+        f"client_id={google_client_id}&"
+        f"redirect_uri={actual_redirect}&"
+        "scope=https://www.googleapis.com/auth/youtube.upload&"
+        "access_type=offline&"
+        "prompt=consent&"
+        f"state={channel_id}"
+    )
+    return RedirectResponse(auth_url)
+
+@app.get("/api/v1/auth/google/callback")
+async def google_callback(code: str, state: str):
+    channel_id = state
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    actual_redirect = "https://backend-production-fc8b.up.railway.app/api/v1/auth/google/callback"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": google_client_id,
+                "client_secret": google_client_secret,
+                "redirect_uri": actual_redirect,
+                "grant_type": "authorization_code"
+            }
+        )
+        
+        token_data = response.json()
+        refresh_token = token_data.get("refresh_token")
+        
+        if refresh_token:
+            from modules.database import save_db_channel_token
+            save_db_channel_token(channel_id, refresh_token)
+            
+            html_content = """
+            <html>
+                <head>
+                    <title>Dezafira — Canal Vinculado</title>
+                    <style>
+                        body {
+                            background-color: #050505;
+                            color: #ffffff;
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            margin: 0;
+                        }
+                        .container {
+                            text-align: center;
+                            border: 1px solid rgba(255,255,255,0.05);
+                            background: rgba(255,255,255,0.02);
+                            backdrop-filter: blur(10px);
+                            padding: 40px;
+                            border-radius: 24px;
+                            box-shadow: 0 0 40px rgba(139, 92, 246, 0.1);
+                        }
+                        h1 {
+                            font-size: 2.5em;
+                            margin-bottom: 10px;
+                            background: linear-gradient(to right, #00f2fe, #4facfe);
+                            -webkit-background-clip: text;
+                            -webkit-text-fill-color: transparent;
+                        }
+                        p { color: rgba(255,255,255,0.7); font-size: 1.1em; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>✓ Canal Vinculado!</h1>
+                        <p>A Dezafira já possui permissão segura de publicação.</p>
+                        <p>Você pode fechar esta aba agora.</p>
+                    </div>
+                </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        else:
+            return {"error": "Falha ao obter token. Certifique-se de que removeu o acesso anterior do app e tente novamente."}
 
 class AnalyzeVideoPayload(BaseModel):
     url: str
