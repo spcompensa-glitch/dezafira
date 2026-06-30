@@ -73,6 +73,15 @@ class Prediction(Base):
 # Criar tabelas se não existirem com tratamento de erro
 try:
     Base.metadata.create_all(bind=engine)
+    
+    # Simple manual migration for approval_status if it's missing (helps fix internal 500 in prod)
+    with engine.connect() as conn:
+        try:
+            conn.execute("ALTER TABLE predictions ADD COLUMN approval_status VARCHAR(30) DEFAULT 'pending';")
+            print("[Database] Coluna approval_status adicionada na tabela predictions.")
+        except Exception:
+            pass # A coluna já existe
+            
 except Exception as table_err:
     print(f"[Database] ⚠️ Falha ao criar tabelas no banco original: {str(table_err)}")
     print("[Database] Recaindo para banco em memória (sqlite:///:memory:) para tabelas")
