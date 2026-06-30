@@ -13,7 +13,7 @@ class YouTubeUploader:
         self.user_data_dir = user_data_dir or os.path.join(self.project_dir, "temp", f"session_{channel_id}")
         os.makedirs(self.user_data_dir, exist_ok=True)
 
-    def upload_video(self, video_path, title, description, is_short=True):
+    def upload_video(self, video_path, title, description, is_short=True, cookies_json=None):
         """
         Faz upload automático do vídeo para o YouTube Studio utilizando Playwright.
         """
@@ -22,20 +22,36 @@ class YouTubeUploader:
 
         print(f"[Uploader] Iniciando processo de upload para: {video_path}")
         
+        import json
         with sync_playwright() as p:
-            # Lança o navegador Chromium persistindo o perfil de usuário (cookies, histórico)
-            # headless=False permite ver o navegador agindo na tela se desejar (ou debugar)
-            browser = p.chromium.launch_persistent_context(
-                user_data_dir=self.user_data_dir,
-                headless=False,  # Em ambiente de teste é melhor ver o fluxo
-                args=[
-                    "--disable-blink-features=AutomationControlled", # Dificulta a detecção como bot
-                    "--start-maximized"
-                ],
-                no_viewport=True
-            )
-            
-            page = browser.pages[0] if browser.pages else browser.new_page()
+            if cookies_json:
+                print("[Uploader] Injetando cookies de sessão salvos no banco de dados...")
+                browser = p.chromium.launch(
+                    headless=True,  # Na nuvem roda 100% invisível!
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox"
+                    ]
+                )
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+                )
+                context.add_cookies(json.loads(cookies_json))
+                page = context.new_page()
+            else:
+                # Lança o navegador Chromium persistindo o perfil de usuário (cookies, histórico)
+                # headless=False permite ver o navegador agindo na tela se desejar (ou debugar)
+                browser = p.chromium.launch_persistent_context(
+                    user_data_dir=self.user_data_dir,
+                    headless=False,  # Em ambiente de teste é melhor ver o fluxo
+                    args=[
+                        "--disable-blink-features=AutomationControlled", # Dificulta a detecção como bot
+                        "--start-maximized"
+                    ],
+                    no_viewport=True
+                )
+                page = browser.pages[0] if browser.pages else browser.new_page()
             
             # Vai para o YouTube Studio
             print("[Uploader] Acessando YouTube Studio...")

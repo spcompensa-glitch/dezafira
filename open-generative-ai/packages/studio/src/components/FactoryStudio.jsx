@@ -45,21 +45,88 @@ export default function FactoryStudio({ apiKey }) {
   const [frequency, setFrequency] = useState('daily');
   const [isAutopilot, setIsAutopilot] = useState(false);
 
-  const handleConnectYouTube = async () => {
-    setStatus('Iniciando conexão segura com o Google OAuth...');
+  // Estados de Login Stealth do Agente (Dezafira)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginVerificationCode, setLoginVerificationCode] = useState('');
+  const [loginStatus, setLoginStatus] = useState('idle'); // idle, typing_email, typing_password, awaiting_2fa, connected, failed
+  const [loginError, setLoginError] = useState(null);
+  const loginPollingRef = useRef(null);
+
+  const handleConnectYouTube = () => {
+    if (selectedChannel === 'default') {
+      alert('Por favor, selecione um canal cadastrado para conectar.');
+      return;
+    }
+    setLoginEmail('');
+    setLoginPassword('');
+    setLoginVerificationCode('');
+    setLoginStatus('idle');
+    setLoginError(null);
+    setIsLoginModalOpen(true);
+  };
+
+  const handleStartStealthLogin = async (e) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      alert('Por favor, preencha o e-mail e a senha.');
+      return;
+    }
+    setLoginStatus('typing_email');
+    setLoginError(null);
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/connect`);
-      if (res.data.auth_url) {
-        window.open(res.data.auth_url, '_blank');
-        setStatus('Aguardando vinculação do canal na nova aba...');
-      } else {
-        alert('Navegador de Login aberto localmente! Realize o login no Chrome.');
-      }
+      await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/login-stealth`, {
+        email: loginEmail,
+        password: loginPassword
+      });
+      
+      // Inicia polling para monitorar status do robô
+      startLoginStatusPolling();
     } catch (err) {
       console.error(err);
-      alert('Falha ao conectar com o Google OAuth. Verifique se o backend dezafira está ativo.');
-    } finally {
-      setStatus('Pronto para iniciar.');
+      setLoginStatus('failed');
+      setLoginError('Falha ao iniciar o agente de login. Verifique se o backend está ativo.');
+    }
+  };
+
+  const startLoginStatusPolling = () => {
+    if (loginPollingRef.current) clearInterval(loginPollingRef.current);
+    
+    loginPollingRef.current = setInterval(async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/connection-status`);
+        const { connection_status, connection_error } = res.data;
+        setLoginStatus(connection_status);
+        
+        if (connection_status === 'connected') {
+          if (loginPollingRef.current) clearInterval(loginPollingRef.current);
+          fetchChannels();
+          setTimeout(() => {
+            setIsLoginModalOpen(false);
+          }, 2500);
+        } else if (connection_status === 'failed') {
+          if (loginPollingRef.current) clearInterval(loginPollingRef.current);
+          setLoginError(connection_error || 'Falha no login do Google.');
+        }
+      } catch (err) {
+        console.error('Erro de polling de login:', err);
+      }
+    }, 2000);
+  };
+
+  const handleSubmit2FA = async (e) => {
+    e.preventDefault();
+    if (!loginVerificationCode.trim()) return;
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/channels/${selectedChannel}/submit-2fa`, {
+        code: loginVerificationCode
+      });
+      setLoginVerificationCode('');
+      setLoginStatus('typing_password'); // Volta a mostrar carregamento enquanto processa
+    } catch (err) {
+      console.error(err);
+      alert('Falha ao enviar código de verificação.');
     }
   };
 
@@ -622,6 +689,128 @@ export default function FactoryStudio({ apiKey }) {
         </div>
 
       </div>
+
+      {/* MODAL DE LOGIN ASSISTIDO POR AGENTE (DEZAFIRA STEALTH) */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 shadow-2xl flex flex-col gap-5 relative">
+            <button 
+              onClick={() => {
+                if (loginPollingRef.current) clearInterval(loginPollingRef.current);
+                setIsLoginModalOpen(false);
+              }}
+              className="absolute right-4 top-4 text-white/40 hover:text-white transition-all text-lg font-bold"
+            >
+              ✕
+            </button>
+
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-bold text-white">Vincular Canal 🔑</h2>
+              <p className="text-[10px] text-white/50">Login direto e seguro por agente de simulação.</p>
+            </div>
+
+            {loginStatus === 'idle' && (
+              <form onSubmit={handleStartStealthLogin} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">E-mail do Google</label>
+                  <input 
+                    type="email" 
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                    className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500/50"
+                    placeholder="exemplo@gmail.com"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Senha do Google</label>
+                  <input 
+                    type="password" 
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                    className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500/50"
+                    placeholder="Sua senha"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold p-3 rounded-xl transition-all shadow-lg shadow-red-600/10"
+                >
+                  Conectar Canal
+                </button>
+              </form>
+            )}
+
+            {(loginStatus === 'typing_email' || loginStatus === 'typing_password') && (
+              <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
+                <div className="w-10 h-10 border-2 border-red-500/20 border-t-red-500 rounded-full animate-spin"></div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-white">Agente conectando ao Google...</span>
+                  <span className="text-[10px] text-white/40">
+                    {loginStatus === 'typing_email' ? 'Digitando e-mail de acesso...' : 'Digitando credencial de senha...'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {loginStatus === 'awaiting_2fa' && (
+              <form onSubmit={handleSubmit2FA} className="flex flex-col gap-4">
+                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 text-center text-xs font-medium text-yellow-400">
+                  ⚠️ Google exige Verificação em Duas Etapas!
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9px] font-bold text-white/40 tracking-widest uppercase">Código de Verificação (SMS / App)</label>
+                  <input 
+                    type="text" 
+                    value={loginVerificationCode}
+                    onChange={(e) => setLoginVerificationCode(e.target.value)}
+                    required
+                    className="bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-yellow-500/50 text-center font-bold tracking-widest"
+                    placeholder="Digite o código (ex: G-123456)"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-xs font-bold p-3 rounded-xl transition-all shadow-lg shadow-yellow-500/10"
+                >
+                  Confirmar Código 2FA
+                </button>
+              </form>
+            )}
+
+            {loginStatus === 'connected' && (
+              <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+                <div className="w-12 h-12 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full flex items-center justify-center text-xl font-bold animate-pulse">
+                  ✓
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-white">Canal Vinculado!</span>
+                  <span className="text-[10px] text-green-400/70 font-semibold">Sessão salva com segurança na Dezafira.</span>
+                </div>
+              </div>
+            )}
+
+            {loginStatus === 'failed' && (
+              <div className="flex flex-col gap-4 text-center py-2">
+                <div className="text-red-500/80 border border-red-500/20 bg-red-500/5 rounded-xl p-3 text-xs font-medium">
+                  {loginError || 'Ocorreu um erro ao conectar ao canal.'}
+                </div>
+                <button 
+                  onClick={() => setLoginStatus('idle')}
+                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold p-3 rounded-xl transition-all"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

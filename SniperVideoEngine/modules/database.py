@@ -40,7 +40,10 @@ class Channel(Base):
     lang = Column(String(10), default="PT")
     status = Column(String(20), default="active")
     monetization_step = Column(String(30), default="setup")
-    youtube_refresh_token = Column(String(500), nullable=True)
+    cookies = Column(String(10000), nullable=True)
+    connection_status = Column(String(30), default="idle")
+    verification_code = Column(String(20), nullable=True)
+    connection_error = Column(String(500), nullable=True)
 
 class Prediction(Base):
     __tablename__ = "predictions"
@@ -89,19 +92,24 @@ def get_db_channels():
                 "lang": c.lang,
                 "status": c.status,
                 "monetization_step": c.monetization_step,
-                "has_token": c.youtube_refresh_token is not None
+                "has_token": c.cookies is not None,
+                "connection_status": c.connection_status,
+                "connection_error": c.connection_error
             } for c in channels
         ]
     finally:
         db.close()
 
-def save_db_channel_token(channel_id: str, refresh_token: str) -> bool:
+def save_db_channel_cookies(channel_id: str, cookies_json: str) -> bool:
     db = SessionLocal()
     try:
         chan = db.query(Channel).filter(Channel.id == channel_id).first()
         if chan:
-            chan.youtube_refresh_token = refresh_token
-            chan.monetization_step = "publishing"  # Marca o canal como pronto/vinculado
+            chan.cookies = cookies_json
+            chan.monetization_step = "publishing"  # Marca o canal como ativo/vinculado
+            chan.connection_status = "connected"
+            chan.verification_code = None
+            chan.connection_error = None
             db.commit()
             return True
         return False

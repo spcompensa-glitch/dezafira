@@ -137,10 +137,10 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
         final_video_path = f"/outputs/{final_video_name}"
         absolute_video_path = os.path.join(director.outputs_dir, final_video_name)
         
-        # Obter refresh token do canal se houver
+        # Obter cookies do canal se houver
         db_sess = SessionLocal()
         channel = db_sess.query(Channel).filter(Channel.id == payload.channel_id).first()
-        refresh_token = channel.youtube_refresh_token if channel else None
+        cookies_json = channel.cookies if channel else None
         db_sess.close()
 
         # 2. Upload automático no YouTube Studio se marcado
@@ -150,26 +150,16 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
             title = plan.get("title", f"Roteiro Automático: {payload.prompt}")
             description = plan.get("script", "Vídeo gerado de forma 100% automatizada pelo SniperVideoEngine!")
             
-            if refresh_token:
-                send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload via API oficial do YouTube...")
-                print(f"[API] Iniciando upload automático do vídeo {prediction_id} via YouTube API...")
-                from modules.youtube_api_uploader import YouTubeApiUploader
-                api_uploader = YouTubeApiUploader(refresh_token)
-                upload_success = api_uploader.upload_video(
-                    video_path=absolute_video_path,
-                    title=title,
-                    description=description
-                )
-            else:
-                send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload via Playwright (navegador virtual)...")
-                print(f"[API] Iniciando upload automático do vídeo {prediction_id} via Playwright...")
-                channel_uploader = YouTubeUploader(channel_id=payload.channel_id)
-                upload_success = channel_uploader.upload_video(
-                    video_path=absolute_video_path,
-                    title=title[:90], # Margem de segurança de caracteres do título do YT
-                    description=description,
-                    is_short=True
-                )
+            send_telegram_notification(f"🚀 *[Publicação]* Renderização concluída! Iniciando upload no YouTube via Playwright simulado...")
+            print(f"[API] Iniciando upload automático do vídeo {prediction_id} via Playwright...")
+            channel_uploader = YouTubeUploader(channel_id=payload.channel_id)
+            upload_success = channel_uploader.upload_video(
+                video_path=absolute_video_path,
+                title=title[:90], # Margem de segurança de caracteres do título do YT
+                description=description,
+                is_short=True,
+                cookies_json=cookies_json
+            )
             
             if upload_success:
                 send_telegram_notification(f"✅ *[Publicado!]* O vídeo vertical `{title[:40]}` foi postado e agendado com sucesso no canal!")
@@ -249,115 +239,57 @@ async def delete_channel(channel_id: str):
         raise HTTPException(status_code=404, detail="Canal não encontrado")
     return {"message": "Canal removido com sucesso"}
 
-@app.post("/api/v1/channels/{channel_id}/connect")
-async def connect_channel_session(channel_id: str):
-    # Retorna o link de login do OAuth dezafira
-    # O frontend Next.js lerá esse link e abrirá em uma nova aba
-    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-    if not google_client_id:
-        # Se as credenciais do Google OAuth não existirem nas variáveis, cai para o aviso de uploader local
-        return {
-            "message": "Navegador de Login aberto localmente.", 
-            "auth_url": None
-        }
-        
-    auth_url = f"https://backend-production-fc8b.up.railway.app/api/v1/auth/google/login?channel_id={channel_id}"
-    return {
-        "message": "Link de login OAuth gerado com sucesso.",
-        "auth_url": auth_url
-    }
+class LoginStealthPayload(BaseModel):
+    email: str
+    password: str
 
-@app.get("/api/v1/auth/google/login")
-async def google_login(channel_id: str):
-    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-    if not google_client_id:
-        raise HTTPException(status_code=400, detail="Google OAuth não configurado no servidor (GOOGLE_CLIENT_ID ausente)")
-        
-    actual_redirect = "https://backend-production-fc8b.up.railway.app/api/v1/auth/google/callback"
-    auth_url = (
-        "https://accounts.google.com/o/oauth2/v2/auth?"
-        "response_type=code&"
-        f"client_id={google_client_id}&"
-        f"redirect_uri={actual_redirect}&"
-        "scope=https://www.googleapis.com/auth/youtube.upload&"
-        "access_type=offline&"
-        "prompt=consent&"
-        f"state={channel_id}"
-    )
-    return RedirectResponse(auth_url)
-
-@app.get("/api/v1/auth/google/callback")
-async def google_callback(code: str, state: str):
-    channel_id = state
-    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    actual_redirect = "https://backend-production-fc8b.up.railway.app/api/v1/auth/google/callback"
+@app.post("/api/v1/channels/{channel_id}/login-stealth")
+async def start_login_stealth(channel_id: str, payload: LoginStealthPayload, background_tasks: BackgroundTasks):
+    from modules.agent_login import run_agent_login_stealth
     
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "code": code,
-                "client_id": google_client_id,
-                "client_secret": google_client_secret,
-                "redirect_uri": actual_redirect,
-                "grant_type": "authorization_code"
-            }
-        )
-        
-        token_data = response.json()
-        refresh_token = token_data.get("refresh_token")
-        
-        if refresh_token:
-            from modules.database import save_db_channel_token
-            save_db_channel_token(channel_id, refresh_token)
-            
-            html_content = """
-            <html>
-                <head>
-                    <title>Dezafira — Canal Vinculado</title>
-                    <style>
-                        body {
-                            background-color: #050505;
-                            color: #ffffff;
-                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            height: 100vh;
-                            margin: 0;
-                        }
-                        .container {
-                            text-align: center;
-                            border: 1px solid rgba(255,255,255,0.05);
-                            background: rgba(255,255,255,0.02);
-                            backdrop-filter: blur(10px);
-                            padding: 40px;
-                            border-radius: 24px;
-                            box-shadow: 0 0 40px rgba(139, 92, 246, 0.1);
-                        }
-                        h1 {
-                            font-size: 2.5em;
-                            margin-bottom: 10px;
-                            background: linear-gradient(to right, #00f2fe, #4facfe);
-                            -webkit-background-clip: text;
-                            -webkit-text-fill-color: transparent;
-                        }
-                        p { color: rgba(255,255,255,0.7); font-size: 1.1em; }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <h1>✓ Canal Vinculado!</h1>
-                        <p>A Dezafira já possui permissão segura de publicação.</p>
-                        <p>Você pode fechar esta aba agora.</p>
-                    </div>
-                </body>
-            </html>
-            """
-            return HTMLResponse(content=html_content)
-        else:
-            return {"error": "Falha ao obter token. Certifique-se de que removeu o acesso anterior do app e tente novamente."}
+    # Reseta estados anteriores
+    db = SessionLocal()
+    chan = db.query(Channel).filter(Channel.id == channel_id).first()
+    if chan:
+        chan.connection_status = "idle"
+        chan.verification_code = None
+        chan.connection_error = None
+        db.commit()
+    db.close()
+    
+    # Iniciar o robô em segundo plano para não travar a UI
+    background_tasks.add_task(run_agent_login_stealth, channel_id, payload.email, payload.password)
+    return {"message": "Agente de login simulado iniciado em segundo plano."}
+
+@app.get("/api/v1/channels/{channel_id}/connection-status")
+async def get_connection_status(channel_id: str):
+    db = SessionLocal()
+    chan = db.query(Channel).filter(Channel.id == channel_id).first()
+    if not chan:
+        db.close()
+        raise HTTPException(status_code=404, detail="Canal não encontrado")
+    
+    status = chan.connection_status
+    error = chan.connection_error
+    db.close()
+    return {"connection_status": status, "connection_error": error}
+
+class Submit2FAPayload(BaseModel):
+    code: str
+
+@app.post("/api/v1/channels/{channel_id}/submit-2fa")
+async def submit_verification_code(channel_id: str, payload: Submit2FAPayload):
+    db = SessionLocal()
+    chan = db.query(Channel).filter(Channel.id == channel_id).first()
+    if not chan:
+        db.close()
+        raise HTTPException(status_code=404, detail="Canal não encontrado")
+    
+    # Salva o código digitado na coluna verification_code para o robô ler
+    chan.verification_code = payload.code
+    db.commit()
+    db.close()
+    return {"message": "Código de verificação 2FA enviado com sucesso para o agente."}
 
 class AnalyzeVideoPayload(BaseModel):
     url: str
