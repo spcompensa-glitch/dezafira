@@ -1,7 +1,7 @@
 import os
 import whisper_timestamped as whisper
 try:
-    from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
+    from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, TextClip
 except ImportError:
     try:
         from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -62,7 +62,7 @@ def assemble_video(video_path, voice_path, output_path, music_path=None, music_v
     
     # Ajustar duração do vídeo para bater com a voz de forma compatível
     if video.duration < voice.duration:
-        from moviepy.editor import concatenate_videoclips
+        from moviepy import concatenate_videoclips
         n_repeats = int(voice.duration / video.duration) + 1
         video = concatenate_videoclips([video] * n_repeats)
         video = set_clip_duration(video, voice.duration)
