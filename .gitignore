@@ -51,3 +51,15 @@ nul
 # Arquivos grandes / PDFs
 *.pdf
 tmp/
+
+# Arquivos temporários / Debug
+*.mp4.tmp.wav
+*TEMP_MPY*
+startup_error.txt
+startup_output.txt
+frontend_error.txt
+frontend_output.txt
+*.bak
+=0.3.0
+server.py
+SniperVideoEngineservices__init__.py
