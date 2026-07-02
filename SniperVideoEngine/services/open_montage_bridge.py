@@ -18,6 +18,8 @@ import asyncio
 import shutil
 from typing import Optional, List, Dict, Any
 
+# subprocess importado apenas para compatibilidade futura
+
 # Garantir que podemos importar do diretório pai
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -255,7 +257,7 @@ async def run_fallback_pipeline(
                 output_path=output_path,
                 add_subtitles=True,
                 video_clips=downloaded_clips,
-                target_format="vertical",
+                target_format=video_format,
             )
         else:
             # Sem clipes — criar vídeo apenas com áudio + legendas
