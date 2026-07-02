@@ -1,41 +1,74 @@
-import asyncio
-import edge_tts
 import os
+import asyncio
+from typing import Optional
 
-async def generate_voice(text, output_path, voice="pt-BR-AntonioNeural"):
+
+async def generate_voice(
+    text: str,
+    output_path: str,
+    voice: str = "pt_br_female1",
+    speed: float = 1.0,
+) -> str:
     """
-    Gera um arquivo de áudio a partir de um texto usando Edge-TTS.
-    Fallback para gTTS se houver erro 403 do Edge-TTS no servidor.
+    Gera um arquivo de áudio a partir de um texto usando Kokoro TTS.
+
+    Args:
+        text: Texto para narração
+        output_path: Caminho de saída (WAV ou MP3)
+        voice: Voz a usar (ex: 'pt_br_female1', 'pt_br_male1')
+        speed: Velocidade da fala (1.0 = normal)
+
+    Returns:
+        Caminho do arquivo gerado
     """
-    try:
-        communicate = edge_tts.Communicate(text, voice)
-        await communicate.save(output_path)
-        print(f"Áudio gerado com sucesso via Edge-TTS: {output_path}")
-    except Exception as e:
-        print(f"[Voice-Gen] ⚠️ Falha no Edge-TTS ({e}). Tentando fallback com gTTS...")
+
+    def _generate():
         try:
-            from gtts import gTTS
-            lang = "pt"
-            if "en-" in voice.lower():
-                lang = "en"
-            elif "es-" in voice.lower():
-                lang = "es"
-                
-            def save_gtts():
-                tts = gTTS(text=text, lang=lang, slow=False)
-                tts.save(output_path)
-            
-            await asyncio.to_thread(save_gtts)
-            print(f"[Voice-Gen] Áudio gerado com sucesso via gTTS (Google Fallback): {output_path}")
-        except Exception as fallback_err:
-            raise Exception(f"Ambos os motores de voz falharam. Edge-TTS: {e} | gTTS: {fallback_err}")
+            from kokoro import KPipeline
+            import soundfile as sf
+
+            pipeline = KPipeline(lang_code="p")  # 'p' = Portuguese
+
+            generator = pipeline(text, voice=voice, speed=speed)
+
+            # Se for salvar como MP3, salvar WAV temporário primeiro
+            is_mp3 = output_path.lower().endswith(".mp3")
+            wav_path = output_path if not is_mp3 else output_path + ".tmp.wav"
+
+            for i, (gs, ps, audio) in enumerate(generator):
+                sf.write(wav_path, audio, 24000)
+
+            print(f"[Voice-Kokoro] Audio gerado: {wav_path}")
+
+            # Converter para MP3 se necessário
+            if is_mp3:
+                try:
+                    from pydub import AudioSegment
+                    audio_segment = AudioSegment.from_wav(wav_path)
+                    audio_segment.export(output_path, format="mp3", bitrate="192k")
+                    os.remove(wav_path)  # Remover WAV temporário
+                    print(f"[Voice-Kokoro] Convertido para MP3: {output_path}")
+                except Exception as e:
+                    print(f"[Voice-Kokoro] Erro ao converter MP3 ({e}). Mantendo WAV.")
+                    if os.path.exists(wav_path):
+                        os.rename(wav_path, output_path)
+
+            return output_path
+
+        except ImportError:
+            raise Exception(
+                "Kokoro TTS nao instalado. Instale com: pip install kokoro soundfile"
+            )
+        except Exception as e:
+            raise Exception(f"Erro no Kokoro TTS: {e}")
+
+    return await asyncio.to_thread(_generate)
+
 
 if __name__ == "__main__":
     # Teste rápido
-    texto_teste = "Olá! Este é o Sniper Video Engine. Estamos criando vídeos incríveis para o um crípten e para a Otto Pinturas."
+    texto = "Olá! Esta é a Dezafira. Estamos criando vídeos incríveis de forma automática."
     saida = "../outputs/teste_voz.mp3"
-    
-    # Garantir que a pasta de output existe
     os.makedirs("../outputs", exist_ok=True)
-    
-    asyncio.run(generate_voice(texto_teste, saida))
+    asyncio.run(generate_voice(texto, saida))
+    print(f"Áudio gerado em: {saida}")

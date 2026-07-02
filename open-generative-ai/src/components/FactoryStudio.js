@@ -39,13 +39,20 @@ export function FactoryStudio() {
             <label class="text-[10px] font-bold text-white/40 tracking-widest uppercase">Ideias Brutas / Tópicos (Opcional)</label>
             <textarea id="factory-dump" class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none" rows="2" placeholder="Coloque aqui ideias avulsas ou links de referência..."></textarea>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="flex flex-col gap-2">
                 <label class="text-[10px] font-bold text-white/40 tracking-widest uppercase">Nicho do Canal</label>
                 <select id="factory-brand" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-primary/50">
                     <option value="Geral" class="bg-[#141414]">Geral / Canal Padrão</option>
                     <option value="Dropshipping" class="bg-[#141414]">Dropshipping / E-commerce</option>
                     <option value="Cripto" class="bg-[#141414]">Finanças & Criptomoedas</option>
+                </select>
+            </div>
+            <div class="flex flex-col gap-2">
+                <label class="text-[10px] font-bold text-white/40 tracking-widest uppercase">Formato do Vídeo</label>
+                <select id="factory-format" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-primary/50">
+                    <option value="vertical" class="bg-[#141414]">Vertical 9:16 (Shorts/TikTok)</option>
+                    <option value="horizontal" class="bg-[#141414]">Horizontal 16:9 (YouTube)</option>
                 </select>
             </div>
             <div class="flex flex-col gap-2">
@@ -99,6 +106,7 @@ export function FactoryStudio() {
     const themeInput = cardBriefing.querySelector('#factory-theme');
     const dumpInput = cardBriefing.querySelector('#factory-dump');
     const brandSelect = cardBriefing.querySelector('#factory-brand');
+    const formatSelect = cardBriefing.querySelector('#factory-format');
     const voiceSelect = cardBriefing.querySelector('#factory-voice');
     const postYtCheckbox = cardBriefing.querySelector('#factory-post-yt');
     const generateBtn = cardBriefing.querySelector('#factory-generate-btn');
@@ -171,8 +179,16 @@ export function FactoryStudio() {
                 dump: dumpInput.value,
                 brand: brandSelect.value,
                 voice: voiceSelect.value,
+                video_format: formatSelect.value,
                 post_to_youtube: postYtCheckbox.checked
             };
+
+            // Atualizar aspect ratio do container de preview
+            if (formatSelect.value === 'horizontal') {
+                videoContainer.style.aspectRatio = '16/9';
+            } else {
+                videoContainer.style.aspectRatio = '9/16';
+            }
 
             const response = await fetch('http://127.0.0.1:8000/api/v1/predictions', {
                 method: 'POST',

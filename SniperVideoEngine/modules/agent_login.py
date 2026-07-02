@@ -8,7 +8,7 @@ def run_agent_login_stealth(channel_id: str, email: str, password: str):
     Executa o login simulado com Playwright de forma silenciosa e assistida por banco
     para contornar a Verificação de Duas Etapas (2FA) do Google.
     """
-    print(f"[Agent-Login] 🤖 Iniciando agente de login simulado para o canal: {channel_id}")
+    print("[Agent-Login] Iniciando agente de login simulado para o canal: {}".format(channel_id))
     
     # Helper para atualizar o status do login no banco
     def update_status(status: str, error_msg: str = None, clear_code: bool = False):
@@ -90,7 +90,7 @@ def run_agent_login_stealth(channel_id: str, email: str, password: str):
                     pass
             
             if is_2fa:
-                print("[Agent-Login] ⚠️ Verificação em Duas Etapas (2FA) detectada!")
+                print("[Agent-Login] Verificacao em Duas Etapas (2FA) detectada!")
                 update_status("awaiting_2fa", clear_code=True)
                 
                 # Fica num loop aguardando o Jonatas digitar o código no frontend por até 2 minutos (120 segundos)
@@ -133,7 +133,7 @@ def run_agent_login_stealth(channel_id: str, email: str, password: str):
             has_sid = any(c['name'] == 'SID' for c in cookies_list)
             
             if has_sid:
-                print("[Agent-Login] 🟢 Login concluído com absoluto sucesso!")
+                print("[Agent-Login] Login concluido com sucesso!")
                 # Exportar os cookies como string JSON
                 cookies_json = json.dumps(cookies_list)
                 save_db_channel_cookies(channel_id, cookies_json)
@@ -141,13 +141,13 @@ def run_agent_login_stealth(channel_id: str, email: str, password: str):
                 # Ver se o Google exibiu alguma mensagem de erro na tela
                 error_elem = page.locator("div[jsname='B34EJ']")
                 error_text = error_elem.text_content() if error_elem.is_visible() else "Senha ou código 2FA incorretos."
-                print(f"[Agent-Login] ❌ Login falhou: {error_text}")
+                print("[Agent-Login] Login falhou: {}".format(error_text))
                 update_status("failed", error_text)
                 
             browser.close()
             
         except Exception as e:
-            print(f"[Agent-Login] ❌ Exceção no login do agente: {str(e)}")
+            print("[Agent-Login] Excecao no login do agente: {}".format(str(e)))
             update_status("failed", f"Erro interno do agente: {str(e)}")
             try:
                 browser.close()

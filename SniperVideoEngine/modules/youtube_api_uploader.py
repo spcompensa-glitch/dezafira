@@ -17,11 +17,11 @@ class YouTubeApiUploader:
         utilizando o token OAuth autenticado pelo usuário final.
         """
         if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-            print("[YouTube-API] ⚠️ GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não configurados no servidor. Upload cancelado.")
+            print("[YouTube-API] GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET nao configurados. Upload cancelado.")
             return False
 
         if not self.refresh_token:
-            print("[YouTube-API] ⚠️ Canal não possui token de autorização. Upload cancelado.")
+            print("[YouTube-API] Canal nao possui token de autorizacao. Upload cancelado.")
             return False
 
         try:
@@ -75,9 +75,9 @@ class YouTubeApiUploader:
                 if status:
                     print(f"[YouTube-API] Progresso do upload: {int(status.progress() * 100)}%")
 
-            print(f"[YouTube-API] ✅ Upload concluído com sucesso! Video ID: {response.get('id')}")
+            print("[YouTube-API] Upload concluido com sucesso! Video ID: {}".format(response.get('id')))
             return True
 
         except Exception as e:
-            print(f"[YouTube-API] ❌ Erro durante o upload oficial: {str(e)}")
+            print("[YouTube-API] Erro durante o upload oficial: {}".format(str(e)))
             return False

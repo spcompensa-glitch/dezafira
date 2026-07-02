@@ -3,76 +3,142 @@ import os
 import json
 from modules.brain import SniperBrain
 from modules.voice_gen import generate_voice
-from modules.video_agent import VideoAgent
-from modules.music_agent import MusicAgent
+from modules.pexels_client import PexelsClient
+from modules.scrapling_agent import DezafiraTrendHunter
 from orchestrator import assemble_video
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class SniperDirector:
     def __init__(self):
         self.brain = SniperBrain()
-        self.video_agent = VideoAgent()
-        self.music_agent = MusicAgent()
-        
+        self.trend_hunter = DezafiraTrendHunter()
+        self.pexels = PexelsClient()
+
         self.project_dir = os.path.dirname(os.path.abspath(__file__))
         self.outputs_dir = os.path.join(self.project_dir, "outputs")
+        self.temp_dir = os.path.join(self.project_dir, "outputs", "temp")
         self.assets_dir = os.path.join(self.project_dir, "assets")
-        
-        os.makedirs(self.outputs_dir, exist_ok=True)
 
-    async def produce_campaign(self, theme, brand="Geral", project_id="campanha_01"):
-        print(f"\n{'='*50}")
-        print(f" SNIPER VIDEO ENGINE - INICIANDO PRODUÇÃO")
+        os.makedirs(self.outputs_dir, exist_ok=True)
+        os.makedirs(self.temp_dir, exist_ok=True)
+
+        # Seed conhecimento padrão para canal default
+        try:
+            from services.memory_service import seed_default_knowledge
+            seed_default_knowledge("default")
+        except Exception:
+            pass
+
+    async def produce_campaign(self, theme, brand="Geral", project_id="campanha_01", video_format="vertical"):
+        print(f"\n{'='*60}")
+        print(f" DEZAFIRA - PRODUCAO AUTOMATIZADA")
         print(f" Campanha: {project_id} | Marca: {brand}")
-        print(f"{'='*50}\n")
-        
-        # 1. BRAIN: Roteirização e Planejamento
-        print("[Brain] Gerando roteiro estratégico e prompts visuais...")
-        plan = self.brain.generate_script(theme, brand)
-        print(f"[Brain] Roteiro finalizado. Estimativa: {plan['target_duration']}s")
-        
-        # 2. VOICE: Produção da Locução
+        print(f"{'='*60}\n")
+
+        # ── STEP 1: TREND HUNTING ─────────────────────────────────
+        print("[1/6] Garimpando tendencias no YouTube...")
+        trends = []
+        try:
+            trends = self.trend_hunter.fetch_youtube_trends(theme)
+            if trends:
+                print(f"   [OK] {len(trends)} tendencias encontradas:")
+                for t in trends[:3]:
+                    print(f"      - {t['title']}")
+            else:
+                print("   [AVISO] Nenhuma tendencia encontrada. Usando tema direto.")
+        except Exception as e:
+            print(f"   [AVISO] Erro no trend hunting: {e}")
+
+        # ── STEP 2: ROTEIRO (BRAIN + LLM) ─────────────────────────
+        print("\n[2/6] Gerando roteiro via LLM...")
+        trends_context = "\n".join(
+            [f"- {t['title']} ({t['metric']})" for t in trends[:5]]
+        ) if trends else ""
+        plan = self.brain.generate_script(theme, brand, trends_context=trends_context)
+        print(f"   [OK] Roteiro pronto: \"{plan['title']}\"")
+        print(f"   {len(plan['script'].split())} palavras | ~{plan.get('target_duration', 45)}s")
+
+        # ── STEP 3: LOCUCACAO (KOKORO TTS) ──────────────────────────
         voice_file = os.path.join(self.outputs_dir, f"{project_id}_voice.mp3")
-        print(f"[Voice] Gravando locução em PT-BR...")
-        await generate_voice(plan['script'], voice_file)
-        
-        # 3. MUSIC: Seleção de Trilha Sonora
-        print(f"[Music] Selecionando trilha para o clima: {plan['music_prompt']}")
-        music_file = self.music_agent.select_track(plan['music_prompt'])
-        if music_file:
-            print(f"[Music] Trilha selecionada: {os.path.basename(music_file)}")
-        else:
-            print("[Music] Nenhuma trilha compatível encontrada. Usando modo sem música.")
-        
-        # 4. VIDEO: Geração Real via ComfyUI
-        print("[Video] Iniciando geração de clipes reais...")
-        generated_clips = await self.video_agent.generate_clips(plan['visual_prompts'], project_id)
-        
-        # 5. EDITOR: Montagem Final
+        print("\n[3/6] Gerando locucao via Kokoro TTS...")
+        await generate_voice(plan["script"], voice_file)
+        print(f"   [OK] Locucao salva: {os.path.basename(voice_file)}")
+
+        # ── STEP 4: PRODUCAO DE VIDEO (OpenMontage + Fallback) ────
+        print("\n[4/6] Produzindo video via OpenMontage Bridge...")
+        search_query = self._build_search_query(plan)
+        print(f"   Busca visual: \"{search_query}\"")
+
+        from services.open_montage_bridge import produce_video, is_open_montage_available
+
+        om_available = is_open_montage_available()
+        print(f"   OpenMontage disponivel: {om_available}")
+
         final_output = os.path.join(self.outputs_dir, f"{project_id}_preview.mp4")
-        
-        if generated_clips and len(generated_clips) > 0:
-            video_source = generated_clips[0] # Usa o primeiro clipe gerado
-            print(f"[Editor] Usando clipe gerado: {os.path.basename(video_source)}")
+
+        visual_keywords = plan.get("visual_prompts", [search_query])
+
+        result = await produce_video(
+            task_id=0,  # Task ID 0 = chamada direta do manager
+            prompt=plan.get("title", theme),
+            script_text=plan.get("script", ""),
+            visual_keywords=visual_keywords,
+            voice_path=voice_file,
+            channel_id="default",
+            provider="nvidia",
+            video_format=video_format,
+        )
+
+        if result.get("success"):
+            print(f"   [OK] Video produzido! Modo: {result.get('mode', 'unknown')}")
+            print(f"   Tamanho: {result.get('size_mb', '?')}MB")
         else:
-            print("[Editor] ⚠️ Nenhum clipe gerado. Usando placeholder de emergência.")
-            video_source = os.path.join(self.assets_dir, "placeholder_video.mp4")
-        
-        print("[Editor] Realizando montagem do vídeo final...")
-        assemble_video(video_source, voice_file, final_output, music_path=music_file)
-        
-        print(f"\n{'='*50}")
-        print(f" CAMPANHA PRONTA PARA REVISÃO!")
-        print(f" Arquivo Preview: {final_output}")
-        print(f"{'='*50}\n")
-        
+            print(f"   [ERRO] Falha na producao: {result.get('error')}")
+
+        # ── STEP 5: RESUMO ────────────────────────────────────────
+        print(f"\n{'='*60}")
+        if os.path.exists(final_output):
+            size_mb = os.path.getsize(final_output) / (1024 * 1024)
+            print(f" [OK] PRODUCAO CONCLUIDA!")
+            print(f" Video: {final_output}")
+            print(f" Tamanho: {size_mb:.1f}MB")
+        else:
+            print(f" [AVISO] PRODUCAO PARCIAL - Sem video final")
+            print(f" Roteiro e audio disponiveis em: {self.outputs_dir}")
+
+        print(f" Roteiro: {plan['title']}")
+        print(f"{'='*60}\n")
+
+        # Registrar no Shared Memory
+        try:
+            from services.memory_service import log_success_pattern
+            log_success_pattern("default", search_query, "Pipeline classica concluida")
+        except Exception:
+            pass
+
         return plan
+
+    def _build_search_query(self, plan):
+        """Construi query de busca para o Pexels extraindo palavras-chave dos visual_prompts."""
+        visual_prompts = plan.get("visual_prompts", [])
+        if visual_prompts:
+            prompt = visual_prompts[0]
+            stopwords = {'a', 'o', 'e', 'de', 'do', 'da', 'em', 'um', 'uma', 'com', 'para', 'por',
+                         'the', 'of', 'in', 'to', 'and', 'is', 'with', 'for', 'on', 'at', 'high',
+                         'quality', 'cinematic', 'shot', 'of', 'person', 'thinking', 'about'}
+            words = prompt.split()
+            keywords = [w.strip('.,!?;:"') for w in words
+                        if w.lower().strip('.,!?;:"') not in stopwords and len(w) > 3]
+            return ' '.join(keywords[:5]) if keywords else prompt[:80]
+
+        # Fallback: usar o titulo como query
+        return plan.get("title", "abstract technology")[:80]
+
 
 if __name__ == "__main__":
     director = SniperDirector()
-    
-    # Exemplo de uso:
-    tema = "Como a Otto Pinturas transforma fachadas de prédios com segurança e rapidez"
-    asyncio.run(director.produce_campaign(tema, "Otto Pinturas", "otto_predios_01"))
+    tema = "Como a Inteligência Artificial está transformando o mundo em 2026"
+    asyncio.run(director.produce_campaign(tema, "Dezafira", "test_pipeline_01"))

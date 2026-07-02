@@ -49,18 +49,79 @@ def transcribe_audio_to_words(audio_path):
             })
     return words_data
 
-def assemble_video(video_path, voice_path, output_path, music_path=None, music_volume=0.1, add_subtitles=True):
+def assemble_video(video_path, voice_path, output_path, music_path=None, music_volume=0.1, add_subtitles=True, video_clips=None, target_format="vertical"):
     """
-    Une um clip de vídeo com uma narração e, opcionalmente, uma trilha sonora.
-    Gera e queima legendas dinâmicas palavra por palavra no vídeo final.
+    Une clips de video com uma narracao e, opcionalmente, uma trilha sonora.
+    Gera e queima legendas dinamicas palavra por palavra no video final.
+
+    Args:
+        video_path: Caminho do clipe principal de video
+        voice_path: Caminho do audio narrado
+        output_path: Caminho de saida do MP4
+        music_path: Caminho opcional de musica de fundo
+        music_volume: Volume da musica (0.0 a 1.0)
+        add_subtitles: Se True, gera legendas dinamicas
+        video_clips: Lista de caminhos de clips para concatenar (opcional)
     """
-    print(f"[Orchestrator] Iniciando montagem: {video_path}")
+    print(f"[Orchestrator] Iniciando montagem")
     
-    # 1. Carregar clips de mídia
-    video = VideoFileClip(video_path)
     voice = AudioFileClip(voice_path)
     
-    # Ajustar duração do vídeo para bater com a voz de forma compatível
+    # 1. Montar o video base
+    if video_clips and len(video_clips) > 1:
+        # Concatenar multiplos clips do Pexels
+        print(f"[Orchestrator] Concatenando {len(video_clips)} clips...")
+        clips = []
+        for clip_path in video_clips:
+            try:
+                clip = VideoFileClip(clip_path)
+                clips.append(clip)
+            except Exception as e:
+                print(f"[Orchestrator] Aviso: erro ao carregar {clip_path}: {e}")
+        
+        if clips:
+            from moviepy import concatenate_videoclips
+            # Redimensionar todos os clips para o formato alvo
+            if target_format == "vertical":
+                target_w, target_h = 1080, 1920  # 9:16
+            else:
+                target_w, target_h = 1920, 1080  # 16:9
+            
+            resized_clips = []
+            for clip in clips:
+                try:
+                    if target_format == "vertical" and clip.w > clip.h:
+                        # Landscape -> crop + resize para vertical
+                        clip = clip.cropped(x1=(clip.w - clip.h * 9/16) / 2, x2=(clip.w + clip.h * 9/16) / 2)
+                        clip = clip.resized(height=target_h)
+                    elif target_format == "horizontal" and clip.h > clip.w:
+                        # Portrait -> crop + resize para horizontal
+                        clip = clip.cropped(y1=(clip.h - clip.w * 9/16) / 2, y2=(clip.h + clip.w * 9/16) / 2)
+                        clip = clip.resized(width=target_w)
+                    else:
+                        # Crop to target aspect ratio, then resize
+                        target_ratio = target_w / target_h
+                        if clip.w / clip.h > target_ratio:
+                            new_w = int(clip.h * target_ratio)
+                            clip = clip.cropped(x1=(clip.w - new_w) / 2, x2=(clip.w + new_w) / 2)
+                        elif clip.w / clip.h < target_ratio:
+                            new_h = int(clip.w / target_ratio)
+                            clip = clip.cropped(y1=(clip.h - new_h) / 2, y2=(clip.h + new_h) / 2)
+                        clip = clip.resized(width=target_w, height=target_h)
+                    resized_clips.append(clip)
+                except Exception as e:
+                    print("[Orchestrator] Aviso: erro ao redimensionar clip: {}".format(e))
+            if resized_clips:
+                video = concatenate_videoclips(resized_clips, method="compose")
+            else:
+                print("[Orchestrator] AVISO: Nenhum clip valido apos redimensionamento")
+                video = VideoFileClip(video_path)
+        else:
+            video = VideoFileClip(video_path)
+    else:
+        video = VideoFileClip(video_path)
+    
+    # Ajustar duracao do video para bater com a voz
     if video.duration < voice.duration:
         from moviepy import concatenate_videoclips
         n_repeats = int(voice.duration / video.duration) + 1
@@ -86,8 +147,19 @@ def assemble_video(video_path, voice_path, output_path, music_path=None, music_v
             words = transcribe_audio_to_words(voice_path)
             subtitle_clips = []
             
-            # Fonte limpa e grossa, ideal para vídeos curtos
-            font_to_use = "Arial-Bold"
+            # Fonte limpa e grossa, ideal para videos curtos
+            # Usar caminho absoluto da fonte para compatibilidade com Windows
+            font_candidates = [
+                os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts', 'arial.ttf'),
+                os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts', 'arialbd.ttf'),
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+            ]
+            font_to_use = 'Arial'
+            for fc in font_candidates:
+                if os.path.exists(fc):
+                    font_to_use = fc
+                    break
             
             for w in words:
                 word_text = w["word"]
@@ -114,7 +186,7 @@ def assemble_video(video_path, voice_path, output_path, music_path=None, music_v
                 print(f"[Orchestrator] Aplicando {len(subtitle_clips)} legendas palavra por palavra no vídeo.")
                 video = CompositeVideoClip([video] + subtitle_clips)
         except Exception as e:
-            print(f"[Orchestrator] ⚠️ Falha ao gerar legendas dinâmicas: {e}. Gerando vídeo sem legendas.")
+            print(f"[Orchestrator] AVISO: Falha ao gerar legendas: {e}. Gerando video sem legendas.")
             
     # 4. Exportar o vídeo final
     print(f"[Orchestrator] Renderizando vídeo em: {output_path}...")

@@ -1,5 +1,5 @@
 @echo off
-title INSTALADOR & INICIALIZADOR DEZAFIRA LOCAL STUDIO 💎
+title INSTALADOR E INICIALIZADOR DEZAFIRA LOCAL STUDIO
 color 0b
 
 echo =====================================================================
@@ -27,7 +27,7 @@ cd ..
 echo [*] Configurando ambiente Backend (FastAPI)...
 cd SniperVideoEngine
 if not exist venv (
-    echo [!] Criando ambiente virtual Python (venv)...
+    echo [!] Criando ambiente virtual Python venv...
     python -m venv venv
 )
 call venv\Scripts\activate

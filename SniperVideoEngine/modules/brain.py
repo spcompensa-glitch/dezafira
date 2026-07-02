@@ -7,8 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class SniperBrain:
-    def __init__(self, api_key=None):
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+    def __init__(self):
         self.nvidia_key = os.getenv("NVIDIA_API_KEY")
         self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "brand_config")
 
@@ -19,106 +18,142 @@ class SniperBrain:
                 return f.read()
         return f"[Arquivo {filename} não configurado. Por favor, adicione as diretrizes.]"
 
-    def _call_deepseek(self, system_prompt, user_prompt, temperature=0.7):
-        # 1. Tentar Nvidia NIM API (Llama 3.3 70b)
-        if self.nvidia_key:
-            try:
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.nvidia_key}"
-                }
-                payload = {
-                    "model": "meta/llama-3.3-70b-instruct",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "temperature": temperature,
-                    "max_tokens": 1500
-                }
-                response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=25.0)
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"]
-                else:
-                    print(f"[LLM-Nvidia] Falha no status ({response.status_code}): {response.text}")
-            except Exception as e:
-                print(f"[LLM-Nvidia] Erro na chamada: {e}")
+    def _call_llm(self, system_prompt, user_prompt, temperature=0.7):
+        """Chama o LLM via Nvidia NIM (Llama 3.3 70B)."""
+        if not self.nvidia_key:
+            raise ValueError("NVIDIA_API_KEY não configurada no .env.")
 
-        # 2. Fallback para Deepseek API
-        if self.api_key:
-            try:
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.api_key}"
-                }
-                payload = {
-                    "model": "deepseek-chat",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "temperature": temperature
-                }
-                response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload, timeout=25.0)
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"]
-            except Exception as e:
-                print(f"[LLM-Deepseek] Erro na chamada: {e}")
-                raise e
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.nvidia_key}"
+            }
+            payload = {
+                "model": "meta/llama-3.3-70b-instruct",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": temperature,
+                "max_tokens": 1500
+            }
+            response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=25.0)
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"]
+            else:
+                raise Exception(f"Nvidia NIM retornou status {response.status_code}: {response.text[:200]}")
+        except Exception as e:
+            print(f"[LLM] Erro ao chamar Nvidia NIM: {e}")
+            raise
 
-        raise ValueError("Nenhuma chave válida encontrada (NVIDIA_API_KEY ou DEEPSEEK_API_KEY) no arquivo .env para processar a inteligência do roteiro.")
+    def generate_script(self, theme, brand="Geral", trends_context="", channel_context=""):
+        """Gera o roteiro, titulo, prompts visuais e clima musical unificados para a Dezafira em JSON
 
-    def generate_script(self, theme, brand="Geral"):
-        """Gera o roteiro, título, prompts visuais e clima musical unificados para a Dezafira em JSON"""
+        Args:
+            theme: Tema do vídeo
+            brand: Nicho/marca
+            trends_context: Contexto de tendências do YouTube
+            channel_context: Contexto do Shared Memory (channel_knowledge) para personalização
+        """
         brand_bible = self._read_config_file("brand_bible.md")
         target_audience = self._read_config_file("target_audience.md")
         voice_guide = self._read_config_file("voice_guide.md")
         
-        system_prompt = f"""
-        Você é o Roteirista e Diretor Executivo da Dezafira, especialista em criar vídeos curtos altamente virais de alta conversão (para YouTube Shorts/TikTok).
+        system_prompt = """
+        Voce e o Roteirista e Diretor Executivo da Dezafira, especialista em criar videos curtos altamente virais de alta conversao (para YouTube Shorts/TikTok).
+
+        === REGRAS DE GROWTH HACKING (OBRIGATÓRIAS) ===
+        1. HOOK IMPLACÁVEL: Os primeiros 3 segundos DEVEM prender a atenção. 
+           NUNCA comece com "Olá pessoal", "Bem-vindos", "Neste vídeo vou mostrar" ou introduções lentas.
+           Comece direto no ápice do assunto: um fato intrigante, uma pergunta provocativa ou uma quebra de expectativa.
+
+        2. RITMO VISUAL: Nenhuma cena deve durar mais de 2.5 segundos.
+           Alterne palavras-chave visuais para manter o ritmo frenético.
+
+        3. TÍTULO MAGNÉTICO: Use a fórmula [Gatilho de Curiosidade] + [Fato Inesperado].
+           Ex: "A mentira que te contaram sobre..." ao invés de "História de..."
+           Evite títulos meramente informativos ou descritivos.
+
+        4. ESTRUTURA: Uma ideia por frase. Sem repetir o mesmo conceito.
+           Cada frase deve obrigar o espectador a querer ouvir a próxima.
+
+        === DIRETRIZES DO CANAL ===
         Use as diretrizes abaixo para formatar o tom de voz e estilo do roteiro:
-        
+
         [BRAND BIBLE]
-        {brand_bible}
-        
+        {}
+
         [TARGET AUDIENCE]
-        {target_audience}
-        
+        {}
+
         [VOICE GUIDE]
-        {voice_guide}
-        """
+        {}
+        """.format(brand_bible, target_audience, voice_guide)
         
-        user_prompt = f"""
-        Gere um plano de vídeo completo em formato JSON para o tema: "{theme}" (Nicho: {brand}).
-        O vídeo deve ter alta retenção nos primeiros 3 segundos e seguir as diretrizes do YouTube contra conteúdo reutilizado (crie um roteiro profundo, autoral e com forte storytelling).
+        # Adicionar contexto do Shared Memory se disponível
+        memory_block = ""
+        if channel_context:
+            memory_block = "\n[MEMORIA DE LONGO PRAZO DO CANAL]\n{}\n".format(channel_context)
         
+        trends_block = ""
+        if trends_context:
+            trends_block = "\n[TENDENCIAS ATUAIS NO YOUTUBE]\n{}\n".format(trends_context)
+        
+        user_prompt = """
+        Gere um plano de video completo em formato JSON para o tema: "{}" (Nicho: {}).
+        {}
+        {}
+        O video deve ter alta retencao nos primeiros 3 segundos e seguir as diretrizes do YouTube contra conteudo reutilizado (crie um roteiro profundo, autoral e com forte storytelling).
+
+        LEMBRE-SE: 
+        - NUNCA comece com saudações
+        - Máximo 120 palavras para 40-50 segundos
+        - Uma ideia por frase
+        - Título com gatilho de curiosidade (< 60 chars)
+
         Retorne estritamente um objeto JSON com o seguinte formato, sem blocos de texto explicativos adicionais antes ou depois:
         {{
-            "title": "Título com alta tensão emocional e menos de 60 caracteres",
-            "script": "Texto corrido que será narrado de forma com excelente entonação (máximo 120 palavras para um vídeo de 40-50 segundos). Escreva de forma fluida.",
-            "visual_prompts": ["Prompt visual detalhado em inglês para o clipe 1", "Prompt visual detalhado em inglês para o clipe 2", "Prompt visual detalhado em inglês para o clipe 3"],
+            "title": "Titulo com gatilho de curiosidade e menos de 60 caracteres",
+            "script": "Texto corrido que sera narrado (maximo 120 palavras para 40-50s). Comece direto no assunto, sem introduções.",
+            "visual_prompts": ["Keyword visual em ingles para cena 1", "Keyword visual em ingles para cena 2", "Keyword visual em ingles para cena 3"],
             "music_prompt": "Clima musical sugerido (ex: dark techno, epic motivation, ambient tech)",
             "target_duration": 45
         }}
-        """
+        """.format(theme, brand, trends_block, memory_block)
         
         try:
-            res_text = self._call_deepseek(system_prompt, user_prompt, temperature=0.7)
+            res_text = self._call_llm(system_prompt, user_prompt, temperature=0.7)
             # Limpar o texto se a IA colocar marcações de markdown ```json
             if "```json" in res_text:
                 res_text = res_text.split("```json")[1].split("```")[0].strip()
             elif "```" in res_text:
                 res_text = res_text.split("```")[1].split("```")[0].strip()
             
-            return json.loads(res_text.strip())
+            plan = json.loads(res_text.strip())
+
+            # Validação pós-geração: Rejeitar se começar com saudação
+            script = plan.get("script", "")
+            forbidden_starts = ["olá", "oi", "bem-vindo", "bem vindo", "neste vídeo", "nesse vídeo", "e aí", "fala galera"]
+            if script:
+                first_words = script.lower().strip()[:30]
+                for forbidden in forbidden_starts:
+                    if first_words.startswith(forbidden):
+                        print(f"[Brain] Roteiro rejeitado: começa com '{forbidden}'. Regenerando...")
+                        # Ajustar o script removendo a saudação
+                        sentences = script.split(". ")
+                        if len(sentences) > 1:
+                            plan["script"] = ". ".join(sentences[1:])
+                        break
+
+            return plan
         except Exception as e:
             print(f"[Brain] Falha ao processar resposta estruturada do LLM: {e}")
             # Fallback em caso de erro de parsing JSON
             return {
-                "title": f"Segredo do {brand}: {theme}",
-                "script": f"Você já se perguntou sobre {theme}? A maioria das pessoas erra feio tentando fazer isso sozinho. Mas a verdade é bem mais simples. Se você focar no método correto, os resultados aparecem de verdade.",
-                "visual_prompts": ["High quality cinematic shot of a person thinking about success, dark ambient lighting"],
-                "music_prompt": "ambient tech",
+                "title": f"O erro que destruiu {theme}",  # Título com gatilho
+                "script": f"Você sabia que 90% das pessoas erram feio ao tentar {theme[:30]}? Pois é. A verdade é bem mais simples do que parece. E é exatamente isso que vou te mostrar agora.",
+                "visual_prompts": ["person looking surprised at screen", "abstract technology concept", "person achieving success"],
+                "music_prompt": "epic motivation",
                 "target_duration": 30
             }
 
@@ -152,7 +187,7 @@ class SniperBrain:
         Retorne as 5 opções. Para cada uma, explique em uma linha qual medo específico ativa no viewer.
         No final, recomende qual você considera o melhor e o porquê.
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.8)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.8)
 
     def generate_intro(self, selected_title):
         """Skill 2 - Intros magnéticas (3 variações)"""
@@ -178,7 +213,7 @@ class SniperBrain:
         Cada variação deve ter no máximo 100 palavras.
         Variantes com ângulos emocionais diferentes: medo / ironia / dado surpreendente.
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.7)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.7)
 
     def verify_intro_quality(self, intro_text):
         """Skill 2 - Controle de qualidade da Intro"""
@@ -198,7 +233,7 @@ class SniperBrain:
         INTRODUÇÃO A SER AVALIADA:
         {intro_text}
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.3)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.3)
 
     def generate_outline(self, title, brain_dump):
         """Skill 3 - Estrutura narrativa (Outline)"""
@@ -230,7 +265,7 @@ class SniperBrain:
         - O payoff da seção em uma frase
         - O loop que se abre para a próxima seção
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.7)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.7)
 
     def generate_section_body(self, title, section_name, previous_section_last_line, this_section_theme, next_section_theme):
         """Skill 4 - Redação de Seção Individual seguindo estrutura psicológica"""
@@ -267,7 +302,7 @@ class SniperBrain:
 
         Escreva 2 variações dessa seção.
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.7)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.7)
 
     def generate_ctas(self, full_script):
         """Skill 6 - Alocação natural de chamados para ação (CTAs)"""
@@ -294,7 +329,7 @@ class SniperBrain:
         
         Retorne a lista com o posicionamento exato, o texto sugerido (máximo 3 frases) e a justificativa psicológica do momento.
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.5)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.5)
 
     def run_collaboration_report(self, generated_script, edited_script):
         """Parte 3 - Feedback Loop: Aprende com as correções do usuário"""
@@ -319,12 +354,12 @@ class SniperBrain:
         2. MUDANÇAS DE ESTILO (Frases que mudei, palavras proibidas novas, ajustes de ritmo)
         3. ATUALIZAÇÕES PARA O VOICE GUIDE (Reescreva apenas os trechos do Voice Guide que precisam ser modificados)
         """
-        return self._call_deepseek(system_prompt, user_prompt, temperature=0.5)
+        return self._call_llm(system_prompt, user_prompt, temperature=0.5)
 
 if __name__ == "__main__":
-    # Teste rápido de integração com DeepSeek
+    # Teste rápido de integração com LLM
     brain = SniperBrain()
-    print("Testando conexão com a API DeepSeek...")
+    print("Testando conexão com Nvidia NIM...")
     try:
         res = brain.generate_youtube_titles("Como sair do zero no dropshipping em 2026", "Não precisa de estoque, focar em tráfego orgânico com TikTok, perigos de mineração errada.")
         print(res)

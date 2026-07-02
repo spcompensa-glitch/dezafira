@@ -62,7 +62,7 @@ class YouTubeUploader:
             
             # Verifica se o usuário está logado
             if "login" in page.url or "signin" in page.url:
-                print("[Uploader] ⚠️ ATENÇÃO: Você não está logado no YouTube Studio.")
+                print("[Uploader] ATENCAO: Voce nao esta logado no YouTube Studio.")
                 print("[Uploader] Realize o login manualmente no navegador que acabou de abrir.")
                 print("[Uploader] O robô aguardará até 3 minutos para que você faça o login...")
                 try:
@@ -70,7 +70,7 @@ class YouTubeUploader:
                     page.wait_for_selector("a#logo", timeout=180000) 
                     print("[Uploader] Login detectado com sucesso!")
                 except Exception:
-                    print("[Uploader] ❌ Limite de tempo de login excedido. Abortando upload.")
+                    print("[Uploader] Limite de tempo de login excedido. Abortando upload.")
                     browser.close()
                     return False
 
@@ -149,7 +149,7 @@ class YouTubeUploader:
             done_button.click()
             
             time.sleep(5)
-            print("[Uploader] 🎉 Upload concluído com sucesso!")
+            print("[Uploader] Upload concluido com sucesso!")
             browser.close()
             return True
 

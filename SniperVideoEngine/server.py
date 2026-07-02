@@ -7,6 +7,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
@@ -27,7 +28,13 @@ from modules.database import (
     create_db_ai_created_channel,
     delete_db_ai_created_channel
 )
-from modules.telegram_bot import init_telegram_bot, send_telegram_notification
+
+try:
+    from modules.telegram_bot import init_telegram_bot, send_telegram_notification
+except ImportError:
+    print("[Server] telebot nao instalado. Telegram Bot desabilitado.")
+    def init_telegram_bot(*args, **kwargs): pass
+    def send_telegram_notification(text: str): pass
 
 app = FastAPI(title="F.Video & Open-Generative-AI Integration API")
 
@@ -45,8 +52,10 @@ app.add_middleware(
 
 # Logs de Atividade em Tempo Real da Esteira
 application_logs = [
-    "[Info] Fábrica de Canais Dezafira inicializada com sucesso.",
-    "[Info] Pronto para iniciar o ciclo autônomo com o Hermes."
+    "[Info] Fabrica de Canais Dezafira inicializada com sucesso.",
+    "[Info] OpenMontage Engine disponivel como motor de renderizacao.",
+    "[Info] Shared Memory System (channel_knowledge) ativo.",
+    "[Info] Pronto para iniciar o ciclo autonomo com o Hermes."
 ]
 
 def log_application_activity(message: str):
@@ -67,71 +76,53 @@ uploader = YouTubeUploader()
 
 # Servir arquivos estáticos de outputs para poder acessar o vídeo final
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/", include_in_schema=False)
+async def serve_ui():
+    return RedirectResponse(url="http://localhost:3000")
 
 @app.get("/api/v1/logs")
 async def get_application_logs():
     return {"logs": application_logs}
 
-# Helper para chamar LLMs usando Nvidia NIM como primário e DeepSeek como secundário
+# Helper para chamar LLM via Nvidia NIM
 async def query_llm(messages: List[Dict[str, str]]) -> str:
     nvidia_key = os.getenv("NVIDIA_API_KEY", "")
-    deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
 
-    # 1. Tentar Nvidia NIM API
-    if nvidia_key:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    "https://integrate.api.nvidia.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {nvidia_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "meta/llama-3.3-70b-instruct",
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 1024
-                    }
-                )
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"]
-                else:
-                    print(f"[LLM] Falha no Nvidia NIM ({response.status_code}): {response.text}")
-        except Exception as e:
-            print(f"[LLM] Erro ao chamar Nvidia NIM: {str(e)}")
+    if not nvidia_key:
+        return "Chave NVIDIA_API_KEY não configurada no arquivo .env."
 
-    # 2. Fallback para DeepSeek API
-    if deepseek_key:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    "https://api.deepseek.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {deepseek_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "deepseek-chat",
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 1024
-                    }
-                )
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"]
-                else:
-                    print(f"[LLM] Falha na DeepSeek ({response.status_code}): {response.text}")
-        except Exception as e:
-            print(f"[LLM] Erro ao chamar DeepSeek: {str(e)}")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://integrate.api.nvidia.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {nvidia_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "meta/llama-3.3-70b-instruct",
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 1024
+                }
+            )
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"]
+            else:
+                print(f"[LLM] Falha no Nvidia NIM ({response.status_code}): {response.text}")
+    except Exception as e:
+        print(f"[LLM] Erro ao chamar Nvidia NIM: {str(e)}")
 
-    return "Desculpe, todas as APIs de inteligência artificial (Nvidia NIM e DeepSeek) falharam ou não possuem chaves válidas configuradas no arquivo .env."
+    return "Falha ao chamar o LLM. Verifique a NVIDIA_API_KEY no .env."
 
 class FactoryPayload(BaseModel):
     prompt: str
     dump: Optional[str] = ""
     brand: Optional[str] = "Geral"
-    voice: Optional[str] = "pt-BR-AntonioNeural"
+    voice: Optional[str] = "pt_br_female1"
+    video_format: Optional[str] = "vertical"  # 'vertical' (9:16) ou 'horizontal' (16:9)
     post_to_youtube: Optional[bool] = False
     channel_id: Optional[str] = "default"
 
@@ -148,11 +139,12 @@ async def run_factory_pipeline(prediction_id: str, payload: FactoryPayload):
         plan = await director.produce_campaign(
             theme=payload.prompt, 
             brand=payload.brand, 
-            project_id=prediction_id
+            project_id=prediction_id,
+            video_format=payload.video_format
         )
         
-        log_application_activity("Roteiro estruturado. Gerando dublagem OmniVoice e apresentador digital...")
-        send_telegram_notification(f"✍️ *[Roteirização & Dublagem]* Roteiro autoral estruturado e locução gerada via OmniVoice!\n\nIniciando renderização do apresentador digital (InfiniteTalk) e montagem final...")
+        log_application_activity("Roteiro estruturado. Gerando locucao Kokoro TTS e produzindo video...")
+        send_telegram_notification(f"✍️ *[Roteirização & TTS]* Roteiro autoral estruturado e locucao gerada via Kokoro TTS!\n\nIniciando renderizacao via OpenMontage + NVIDIA...")
         
         final_video_name = f"{prediction_id}_preview.mp4"
         final_video_path = f"/outputs/{final_video_name}"
@@ -184,7 +176,8 @@ async def create_prediction(payload: Dict[str, Any], background_tasks: Backgroun
     prompt = payload.get("prompt", "Geração de vídeo Sniper")
     dump = payload.get("dump", "")
     brand = payload.get("brand", "Geral")
-    voice = payload.get("voice", "pt-BR-AntonioNeural")
+    voice = payload.get("voice", "pt_br_female1")
+    video_format = payload.get("video_format", "vertical")
     post_to_youtube = payload.get("post_to_youtube", False)
     channel_id = payload.get("channel_id", "default")
     
@@ -193,14 +186,21 @@ async def create_prediction(payload: Dict[str, Any], background_tasks: Backgroun
         dump=dump,
         brand=brand,
         voice=voice,
+        video_format=video_format,
         post_to_youtube=post_to_youtube,
         channel_id=channel_id
     )
     
     save_db_prediction(prediction_id, prompt, channel_id)
     
-    # Executar a campanha em segundo plano para liberar a requisição HTTP da UI
-    background_tasks.add_task(run_factory_pipeline, prediction_id, factory_payload)
+    # Criar task no Kanban e executar no novo modelo Swarm
+    from modules.database import create_automation_task
+    from modules.swarm_agents import agent_triage
+    task_id = create_automation_task(prompt, channel_id)
+    background_tasks.add_task(
+        agent_triage, task_id, prompt,
+        channel_id, video_format
+    )
     
     return {
         "id": prediction_id,
@@ -506,7 +506,7 @@ async def chat_with_hermes(payload: ChatPayload, background_tasks: BackgroundTas
     system_instruction = (
         "Você é o Hermes, o Agente Orquestrador executivo e extremamente inteligente da plataforma DEZAFIRA, a Fábrica de Canais. "
         "Você está conversando diretamente com o JONATAS, o fundador da Holding Dezafira. "
-        "Você deve explicar a ele que a esteira roda no modo de curadoria (Human-in-the-loop): você vai garimpar a tendência de melhor CPM via Trend Hunter, criar o roteiro otimizado para o YouTube Shorts respeitando 100% as políticas, gerar a narração local com OmniVoice e o apresentador digital. "
+        "Você deve explicar a ele que a esteira roda no modo de curadoria (Human-in-the-loop): voce vai garimpar a tendencia de melhor CPM via Trend Hunter, criar o roteiro otimizado para o YouTube Shorts respeitando 100% as politicas, gerar a narracao com Kokoro TTS e buscar videos stock relevantes no Pexels. "
         "Porém, após o vídeo ficar pronto, você vai aguardar a aprovação explícita do Jonatas na UI (usando os botões de Aprovar e Rejeitar/Pedir Ajustes) antes de realizar a postagem física no canal dele. "
         "Se o Jonatas solicitar qualquer ajuste no vídeo rejeitado, confirme que você entenderá o feedback e corrigirá o roteiro/esteira. Mantenha um tom corporativo, extremamente prestativo e focado em monetização."
     )
@@ -536,18 +536,17 @@ async def chat_with_hermes(payload: ChatPayload, background_tasks: BackgroundTas
         except Exception as e:
             print(f"[Hermes] Erro ao buscar tendências de chat: {e}")
             
-        # Prepara a predição no banco
+        # Prepara a predição no banco (retro-compatibilidade UI)
         pred_id = f"sniper_{uuid.uuid4().hex[:8]}"
         save_db_prediction(pred_id, autonomous_theme, channel_id)
         
-        # Dispara
-        payload_factory = FactoryPayload(
-            prompt=autonomous_theme,
-            post_to_youtube=True,
-            channel_id=channel_id
-        )
-        log_application_activity("Comando recebido do Chat. Hermes ativou a esteira de IA.")
-        background_tasks.add_task(run_factory_pipeline, pred_id, payload_factory)
+        # Cria a Task de Automação para o Swarm
+        from modules.database import create_automation_task
+        from modules.swarm_agents import agent_triage
+        task_id = create_automation_task(autonomous_theme, channel_id)
+        
+        log_application_activity("Comando recebido do Chat. Hermes ativou o Swarm Assíncrono da Esteira.")
+        background_tasks.add_task(agent_triage, task_id, autonomous_theme, channel_id, "vertical")
     
     return {"reply": response_content, "history": hermes_chat_history}
 
@@ -595,7 +594,7 @@ async def startup_event():
             hermes_chat_history.append({"role": "assistant", "content": reply})
             return reply
         except Exception as e:
-            return f"⚠️ Erro ao processar IA do Hermes: {str(e)}"
+            return "Erro ao processar IA do Hermes: {}".format(str(e))
         finally:
             loop.close()
 
@@ -608,7 +607,8 @@ async def startup_event():
                 prompt=theme_text,
                 dump="",
                 brand="Geral",
-                voice="pt-BR-AntonioNeural",
+                voice="pt_br_female1",
+                video_format="vertical",
                 post_to_youtube=True,
                 channel_id="default"
             )
@@ -626,3 +626,112 @@ if __name__ == "__main__":
     import uvicorn
     # Inicia a API no host 127.0.0.1 porta 8000
     uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)
+
+
+class DispatchRequest(BaseModel):
+    tema: str
+    channel_id: str = None
+    provider: Optional[str] = "nvidia"  # 'nvidia' ou 'deepseek'
+    video_format: Optional[str] = "vertical"  # 'vertical' (9:16) ou 'horizontal' (16:9)
+
+
+@app.post("/api/v1/factory/dispatch")
+async def dispatch_multimodal_pipeline(
+    req: DispatchRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Dispara a pipeline de producao de video.
+    Usa OpenMontage como motor principal, com fallback para MoviePy + Pexels.
+    """
+    from modules.database import create_automation_task
+    from modules.swarm_agents import agent_triage
+
+    # Cria a task
+    task_id = create_automation_task(req.tema, req.channel_id)
+
+    # Dispara a pipeline via Swarm Agents com formato de video
+    background_tasks.add_task(
+        agent_triage, task_id, req.tema,
+        req.channel_id or "default",
+        req.video_format
+    )
+
+    return {"message": "Pipeline iniciada via OpenMontage", "task_id": task_id}
+
+
+@app.get("/api/v1/factory/monitor-stats")
+async def get_factory_stats():
+    """
+    Retorna metricas consolidadas para alimentar os contadores visuais do Mission Control.
+    """
+    from sqlalchemy import func
+    from modules.database import SessionLocal, AutomationTask
+
+    db = SessionLocal()
+    try:
+        stats = db.query(
+            AutomationTask.status,
+            func.count(AutomationTask.id)
+        ).group_by(AutomationTask.status).all()
+
+        stats_dict = {status: count for status, count in stats}
+
+        active = db.query(AutomationTask).filter(
+            AutomationTask.status.in_(["triage", "writing", "SEO", "production"])
+        ).order_by(AutomationTask.updated_at.desc()).limit(5).all()
+
+        active_tasks = [{
+            "id": t.id,
+            "title_suggestion": t.title_suggestion,
+            "status": t.status
+        } for t in active]
+
+        return {
+            "total_queued": stats_dict.get("triage", 0),
+            "total_processing": (
+                stats_dict.get("writing", 0)
+                + stats_dict.get("SEO", 0)
+                + stats_dict.get("production", 0)
+            ),
+            "total_ready": stats_dict.get("ready", 0),
+            "total_completed": stats_dict.get("done", 0),
+            "total_failed": stats_dict.get("failed", 0),
+            "active_tasks": active_tasks,
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/v1/factory/openmontage-status")
+async def get_openmontage_status():
+    """
+    Retorna o status detalhado da integracao com OpenMontage.
+    """
+    from services.open_montage_bridge import get_open_montage_status
+    return get_open_montage_status()
+
+
+@app.get("/api/v1/channels/{channel_id}/knowledge")
+async def get_channel_knowledge(channel_id: str):
+    """
+    Retorna o Shared Memory (channel_knowledge) para um canal.
+    """
+    from services.memory_service import get_knowledge
+    return {"knowledge": get_knowledge(channel_id)}
+
+
+@app.post("/api/v1/channels/{channel_id}/knowledge")
+async def save_channel_knowledge(channel_id: str, payload: dict):
+    """
+    Salva um conhecimento no Shared Memory do canal.
+    """
+    from services.memory_service import save_knowledge
+    success = save_knowledge(
+        channel_id=channel_id,
+        category=payload.get("category", "style_guide"),
+        meta_key=payload.get("meta_key", ""),
+        meta_value=payload.get("meta_value", ""),
+        source=payload.get("source", "user_feedback"),
+    )
+    return {"success": success}

@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, DateTime, JSON, ForeignKey, Integer, text
+from sqlalchemy import create_engine, Column, String, DateTime, JSON, ForeignKey, Integer, text, Text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # 1. Determinar URL do banco de dados (Railway Postgres ou SQLite local)
@@ -22,7 +22,7 @@ try:
     with engine.connect() as conn:
         pass
 except Exception as db_err:
-    print(f"[Database] ⚠️ Erro ao conectar no banco original: {str(db_err)}")
+    print(f"[Database]  Erro ao conectar no banco original: {str(db_err)}")
     print("[Database] Acionando fallback resiliente: banco SQLite em memória (sqlite:///:memory:)")
     DATABASE_URL = "sqlite:///:memory:"
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -70,21 +70,56 @@ class Prediction(Base):
     approval_status = Column(String(30), default="pending")  # pending, approved, rejected
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class AutomationTask(Base):
+    __tablename__ = 'automation_tasks'
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    channel_id = Column(String(50), ForeignKey('channels.id'), nullable=True)
+    title_suggestion = Column(String(255), nullable=True)
+    status = Column(String(50), default='triage') # triage, writing, SEO, production, ready, done, failed
+    script_content = Column(Text, nullable=True)
+    metadata_tags = Column(Text, nullable=True)
+    video_url = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ChannelKnowledge(Base):
+    """Shared Memory / Shared Brain — agentes armazenam aprendizados aqui."""
+    __tablename__ = 'channel_knowledge'
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    channel_id = Column(String(50), ForeignKey('channels.id'), nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True)  # style_guide, seo_blacklist, pexels_fallback, audience_insight, growth_hack
+    meta_key = Column(String(100), nullable=False, index=True)  # Ex: 'tom_de_voz', 'failed_keyword_X'
+    meta_value = Column(Text, nullable=False)  # Ex: 'Sombrio e misterioso', 'Evitar buscar'
+    source = Column(String(50), nullable=True)  # Quem escreveu: 'hermes', 'deepseek', 'user_feedback'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # Criar tabelas se não existirem com tratamento de erro
 try:
     Base.metadata.create_all(bind=engine)
     
-    # Simple manual migration for approval_status if it's missing (helps fix internal 500 in prod)
+    # Migrations manuais
     with engine.connect() as conn:
+        # approval_status na tabela predictions
         try:
             conn.execute(text("ALTER TABLE predictions ADD COLUMN approval_status VARCHAR(30) DEFAULT 'pending';"))
             conn.commit()
             print("[Database] Coluna approval_status adicionada na tabela predictions.")
         except Exception:
-            pass # A coluna já existe
+            pass
+        
+        # channel_knowledge — se a migration falhar, a tabela já existe via create_all
+        try:
+            conn.execute(text("ALTER TABLE automation_tasks ADD COLUMN video_url VARCHAR(500);"))
+            conn.commit()
+        except Exception:
+            pass
             
 except Exception as table_err:
-    print(f"[Database] ⚠️ Falha ao criar tabelas no banco original: {str(table_err)}")
+    print(f"[Database]  Falha ao criar tabelas no banco original: {str(table_err)}")
     print("[Database] Recaindo para banco em memória (sqlite:///:memory:) para tabelas")
     DATABASE_URL = "sqlite:///:memory:"
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -275,5 +310,52 @@ def delete_db_ai_created_channel(sub_id: str) -> bool:
             db.commit()
             return True
         return False
+    finally:
+        db.close()
+
+def create_automation_task(title_suggestion: str, channel_id: str = None):
+    db = SessionLocal()
+    try:
+        new_task = AutomationTask(
+            title_suggestion=title_suggestion,
+            channel_id=channel_id,
+            status='triage'
+        )
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+        return new_task.id
+    finally:
+        db.close()
+
+def update_automation_task(task_id: int, **kwargs):
+    db = SessionLocal()
+    try:
+        task = db.query(AutomationTask).filter(AutomationTask.id == task_id).first()
+        if task:
+            for key, value in kwargs.items():
+                if hasattr(task, key):
+                    setattr(task, key, value)
+            db.commit()
+    finally:
+        db.close()
+
+def get_automation_task(task_id: int):
+    db = SessionLocal()
+    try:
+        task = db.query(AutomationTask).filter(AutomationTask.id == task_id).first()
+        if task:
+            return {
+                'id': task.id,
+                'channel_id': task.channel_id,
+                'title_suggestion': task.title_suggestion,
+                'status': task.status,
+                'script_content': task.script_content,
+                'metadata_tags': task.metadata_tags,
+                'video_url': task.video_url,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'updated_at': task.updated_at.isoformat() if task.updated_at else None
+            }
+        return None
     finally:
         db.close()
