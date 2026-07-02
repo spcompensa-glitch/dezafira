@@ -2,9 +2,20 @@ import os
 import re
 import json
 import time
+import warnings
 import urllib.request
 import urllib.parse
 from typing import List, Dict, Any
+
+# Import Scrapling uma vez no nivel do modulo (evita re-import a cada chamada)
+_SCRAPLING_AVAILABLE = False
+try:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        from scrapling.fetchers import Fetcher
+    _SCRAPLING_AVAILABLE = True
+except ImportError:
+    pass
 
 
 class DezafiraTrendHunter:
@@ -30,7 +41,6 @@ class DezafiraTrendHunter:
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
-        self._scrapling_available = None  # Cache do status de disponibilidade
 
     # ─── MÉTODO PRINCIPAL ──────────────────────────────────────────
 
@@ -63,27 +73,14 @@ class DezafiraTrendHunter:
 
     def _try_scrapling(self, query: str) -> List[Dict[str, Any]]:
         """Tenta extrair tendências usando Scrapling (motor principal)."""
-        # Verificar se Scrapling está disponível (cache)
-        if self._scrapling_available is False:
-            return []
-
-        try:
-            from scrapling import Fetcher
-            self._scrapling_available = True
-        except ImportError:
-            self._scrapling_available = False
-            print("[TrendHunter] Scrapling não instalado. pip install scrapling")
-            return []
-        except Exception as e:
-            self._scrapling_available = False
-            print(f"[TrendHunter] Scrapling indisponível: {e}")
+        if not _SCRAPLING_AVAILABLE:
             return []
 
         url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
 
         for attempt in range(self.MAX_RETRIES):
             try:
-                fetcher = Fetcher(auto_match=True)
+                fetcher = Fetcher()
                 response = fetcher.get(url)
 
                 # Extrair títulos
@@ -115,7 +112,7 @@ class DezafiraTrendHunter:
                     trends.append({
                         "title": clean_title,
                         "link": link,
-                        "metric": f"Scrapling • {view_count}" if view_count else "Scrapling",
+                        "metric": f"Scrapling - {view_count}" if view_count else "Scrapling",
                         "view_count": view_count,
                     })
 
@@ -166,7 +163,7 @@ class DezafiraTrendHunter:
                     trends.append({
                         "title": clean_title,
                         "link": link,
-                        "metric": f"HTTP+Crawler • {view_count}" if view_count else "HTTP+Crawler",
+                        "metric": f"HTTP+Crawler - {view_count}" if view_count else "HTTP+Crawler",
                         "view_count": view_count,
                     })
 
@@ -183,7 +180,8 @@ class DezafiraTrendHunter:
 
     # ─── NÍVEL 3: FALLBACK ESTÁTICO ───────────────────────────────
 
-    def _static_fallback(self, query: str) -> List[Dict[str, Any]]:
+    @staticmethod
+    def _static_fallback(query: str) -> List[Dict[str, Any]]:
         """Gera sugestões inteligentes baseadas no tema."""
         templates = [
             ("Segredos que ninguém te conta sobre {}", "Alta retenção estimada"),
@@ -199,7 +197,7 @@ class DezafiraTrendHunter:
             trends.append({
                 "title": title,
                 "link": "",
-                "metric": f"Dezafira AI • {metric}",
+                "metric": f"Dezafira AI - {metric}",
                 "view_count": "",
             })
 

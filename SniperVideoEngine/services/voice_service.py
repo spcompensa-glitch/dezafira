@@ -11,6 +11,7 @@ Suporte PT-BR: Nativo (lang_code='p')
 from typing import List
 
 # Delega toda a lógica para modules/voice_gen.py (única fonte de verdade)
+# Nota: este módulo é reservado para uso futuro (voice cloning, ElevenLabs, etc.)
 from modules.voice_gen import generate_voice
 
 

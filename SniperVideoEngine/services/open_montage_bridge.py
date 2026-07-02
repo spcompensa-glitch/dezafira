@@ -12,13 +12,10 @@ O bridge detecta automaticamente o OpenMontage e usa-o como prioridade.
 
 import os
 import sys
-import subprocess
 import json
 import asyncio
 import shutil
 from typing import Optional, List, Dict, Any
-
-# subprocess importado apenas para compatibilidade futura
 
 # Garantir que podemos importar do diretório pai
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
