@@ -1,17 +1,13 @@
 """
-Dezafira OpenMontage Bridge — Integração com o Motor de Renderização OpenMontage
-=================================================================================
-Este módulo conecta a pipeline da Dezafira ao OpenMontage, que é o motor de
-renderização oficial de vídeos. O OpenMontage usa:
-  - NVIDIA API (Hermes como orquestrador principal)
-  - DeepSeek como fallback
-  - Remotion (Node.js/React) para composição final
-  - Pexels como fonte de mídia stock
+Dezafira OpenMontage Bridge — Motor Principal de Renderização de Vídeo
+======================================================================
+Este módulo é o motor OFICIAL de produção de vídeos da Dezafira.
 
-O bridge oferece 3 modos de operação:
-  1. FULL_PIPELINE: Chama o OpenMontage via subprocess (pipeline completa)
-  2. TOOLS_DIRECT: Usa as ferramentas Python do OpenMontage diretamente
-  3. REMOTION_ONLY: Usa apenas o Remotion para renderização final
+Hierarquia de produção:
+  1. OpenMontage + Remotion (motor principal — pipeline completa)
+  2. MoviePy + Pexels (fallback garantido — funciona sem OpenMontage)
+
+O bridge detecta automaticamente o OpenMontage e usa-o como prioridade.
 """
 
 import os
@@ -19,8 +15,8 @@ import sys
 import subprocess
 import json
 import asyncio
+import shutil
 from typing import Optional, List, Dict, Any
-from pathlib import Path
 
 # Garantir que podemos importar do diretório pai
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,72 +35,95 @@ OUTPUTS_DIR = os.path.join(
     "outputs"
 )
 
+# Cache de disponibilidade (evita checks repetidos no disco)
+_om_available_cache: Optional[bool] = None
+
 
 def is_open_montage_available() -> bool:
-    """Verifica se o OpenMontage está instalado."""
-    return os.path.isdir(OPEN_MONTAGE_DIR) and os.path.isfile(
-        os.path.join(OPEN_MONTAGE_DIR, "setup.py")
-    )
+    """
+    Verifica se o OpenMontage está instalado e funcional.
+    Cacheia o resultado para evitar I/O repetido.
+    """
+    global _om_available_cache
+    if _om_available_cache is not None:
+        return _om_available_cache
+
+    has_dir = os.path.isdir(OPEN_MONTAGE_DIR)
+    has_setup = os.path.isfile(os.path.join(OPEN_MONTAGE_DIR, "setup.py"))
+    has_tools = os.path.isdir(TOOLS_DIR)
+
+    _om_available_cache = has_dir and (has_setup or has_tools)
+
+    if _om_available_cache:
+        print("[OpenMontage] Motor principal detectado")
+    else:
+        print("[OpenMontage] Nao detectado - usando MoviePy+Pexels como motor")
+
+    return _om_available_cache
 
 
 def get_open_montage_status() -> Dict[str, Any]:
     """Retorna o status detalhado da instalação do OpenMontage."""
+    available = is_open_montage_available()
+    remotion_dir = os.path.join(REMOTION_COMPOSER_DIR, "node_modules")
+    has_remotion = os.path.isdir(remotion_dir)
+    tools_count = len(os.listdir(TOOLS_DIR)) if os.path.isdir(TOOLS_DIR) else 0
+
+    npx_path = _find_command("npx", "npx.cmd")
+
     return {
-        "installed": is_open_montage_available(),
+        "installed": available,
         "path": OPEN_MONTAGE_DIR,
-        "remotion_available": os.path.isdir(os.path.join(REMOTION_COMPOSER_DIR, "node_modules")),
-        "tools_count": len(os.listdir(TOOLS_DIR)) if os.path.isdir(TOOLS_DIR) else 0,
+        "remotion_available": has_remotion,
+        "tools_count": tools_count,
+        "npx_available": npx_path is not None,
         "nvidia_configured": bool(os.getenv("NVIDIA_API_KEY")),
-        "deepseek_configured": bool(os.getenv("DEEPSEEK_API_KEY")),
         "pexels_configured": bool(os.getenv("PEXELS_API_KEY")),
+        "mode": "open_montage" if available and has_remotion else "moviepy_fallback",
     }
 
 
-# ─── MODO 1: PIPELINE COMPLETA VIA SUBPROCESS ─────────────────────────
+# ─── MODO 1: PIPELINE OPENMONTAGE + REMOTION (PRINCIPAL) ──────────────
 
 async def run_open_montage_pipeline(
     prompt: str,
     output_path: str,
     provider: str = "nvidia",
     duration_seconds: int = 45,
-    style: str = "documentary_montage",
+    max_retries: int = 2,
 ) -> Dict[str, Any]:
     """
-    Executa a pipeline completa do OpenMontage via chamada de script Python.
-
-    O OpenMontage foi projetado para ser orquestrado por um agente de IA,
-    então esta função atua como o "agente" que comanda a pipeline localmente.
-
-    Args:
-        prompt: Tema do vídeo (ex: "Como a IA está transformando o mundo")
-        output_path: Caminho de saída do vídeo MP4
-        provider: 'nvidia' (padrão) ou 'deepseek'
-        duration_seconds: Duração alvo em segundos
-        style: Estilo da pipeline ('documentary_montage', 'animated_explainer', etc.)
-
-    Returns:
-        Dict com status da operação
+    Executa a pipeline completa do OpenMontage via Remotion.
+    
+    Tenta até max_retries vezes antes de declarar falha.
     """
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    # Construir ambiente com as chaves de API
     env = os.environ.copy()
     env["OPEN_MONTAGE_PROVIDER"] = provider
 
-    # --- Pipeline usando Remotion ---
-    # O OpenMontage usa remotion-composer para renderização.
-    # Vamos usar o render_demo.py como referência e adaptar para nosso caso.
+    for attempt in range(max_retries):
+        try:
+            print(f"[OpenMontage] Tentativa {attempt + 1}/{max_retries}")
+            result = await _run_remotion_pipeline(
+                prompt=prompt,
+                output_path=output_path,
+                duration_seconds=duration_seconds,
+                provider=provider,
+                env=env,
+            )
+            if result.get("success"):
+                return result
+            print(f"[OpenMontage] Falha na tentativa {attempt + 1}: {result.get('error')}")
+        except Exception as e:
+            print(f"[OpenMontage] Erro na tentativa {attempt + 1}: {e}")
 
-    return await _run_remotion_pipeline(
-        prompt=prompt,
-        output_path=output_path,
-        duration_seconds=duration_seconds,
-        provider=provider,
-        env=env,
-    )
+    return {
+        "success": False,
+        "error": f"OpenMontage falhou após {max_retries} tentativas",
+        "output_path": None,
+    }
 
-
-# ─── MODO 2: REMOTION COMPOSER ───────────────────────────────────────
 
 async def _run_remotion_pipeline(
     prompt: str,
@@ -113,21 +132,14 @@ async def _run_remotion_pipeline(
     provider: str = "nvidia",
     env: Dict[str, str] = None,
 ) -> Dict[str, Any]:
-    """
-    Usa o Remotion (remotion-composer) para renderizar o vídeo final.
-
-    Como o OpenMontage é agentic e não tem uma CLI programática tradicional,
-    esta função:
-    1. Gera um arquivo de props JSON para o Remotion
-    2. Chama o Remotion CLI para renderizar
-    """
+    """Renderiza via Remotion (OpenMontage)."""
     env = env or os.environ.copy()
 
-    # Preparar props para o Remotion baseado no prompt
+    # Preparar props para o Remotion
     props = {
         "cuts": [
             {
-                "durationInFrames": duration_seconds * 30,  # 30fps
+                "durationInFrames": duration_seconds * 30,
                 "title": prompt[:60],
                 "subtitle": "Gerado pela Dezafira Factory",
                 "primaryColor": "#1ed760",
@@ -137,92 +149,67 @@ async def _run_remotion_pipeline(
     }
 
     props_path = os.path.join(
-        REMOTION_COMPOSER_DIR,
-        "public",
-        "demo-props",
-        "dezafira_props.json"
+        REMOTION_COMPOSER_DIR, "public", "demo-props", "dezafira_props.json"
     )
     os.makedirs(os.path.dirname(props_path), exist_ok=True)
     with open(props_path, "w", encoding="utf-8") as f:
         json.dump(props, f, ensure_ascii=False, indent=2)
 
-    print(f"[OpenMontageBridge] Props salvos em: {props_path}")
-
-    # Verificar se o Remotion está configurado
     npx_path = _find_command("npx", "npx.cmd", "npx.exe")
     if not npx_path:
         return {
             "success": False,
-            "error": "npx não encontrado. Instale Node.js para usar o Remotion.",
+            "error": "npx não encontrado. Instale Node.js para usar Remotion.",
             "output_path": None,
         }
 
-    try:
-        # Executar Remotion render
-        cmd = [
-            npx_path,
-            "remotion",
-            "render",
-            "src/index.tsx",
-            "Explainer",
-            str(output_path),
-            "--props",
-            str(props_path),
-            "--codec",
-            "h264",
-        ]
+    cmd = [
+        npx_path, "remotion", "render",
+        "src/index.tsx", "Explainer",
+        str(output_path),
+        "--props", str(props_path),
+        "--codec", "h264",
+    ]
 
-        print(f"[OpenMontageBridge] Executando: {' '.join(cmd)}")
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=REMOTION_COMPOSER_DIR,
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+    print(f"[OpenMontage] Executando Remotion: {' '.join(cmd[:5])}...")
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=REMOTION_COMPOSER_DIR,
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
 
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(), timeout=300.0
-        )
+    stdout, stderr = await asyncio.wait_for(
+        process.communicate(), timeout=300.0
+    )
 
-        if process.returncode != 0:
-            return {
-                "success": False,
-                "error": f"Remotion falhou: {stderr.decode()[:500]}",
-                "output_path": None,
-            }
-
-        if os.path.exists(output_path):
-            size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            print(f"[OpenMontageBridge] Vídeo renderizado: {output_path} ({size_mb:.1f}MB)")
-            return {
-                "success": True,
-                "output_path": output_path,
-                "size_mb": round(size_mb, 1),
-                "duration_seconds": duration_seconds,
-            }
-        else:
-            return {
-                "success": False,
-                "error": "Renderização concluída mas arquivo não encontrado.",
-                "output_path": None,
-            }
-
-    except asyncio.TimeoutError:
+    if process.returncode != 0:
+        error_msg = stderr.decode(errors="ignore")[:500]
         return {
             "success": False,
-            "error": "Remotion excedeu o tempo limite de 300 segundos.",
+            "error": f"Remotion retornou código {process.returncode}: {error_msg}",
             "output_path": None,
         }
-    except Exception as e:
+
+    if os.path.exists(output_path):
+        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        print("[OpenMontage] Video renderizado: {} ({:.1f}MB)".format(output_path, size_mb))
         return {
-            "success": False,
-            "error": str(e),
-            "output_path": None,
+            "success": True,
+            "output_path": output_path,
+            "size_mb": round(size_mb, 1),
+            "duration_seconds": duration_seconds,
         }
 
+    return {
+        "success": False,
+        "error": "Remotion concluiu mas arquivo não encontrado.",
+        "output_path": None,
+    }
 
-# ─── MODO 3: FERRAMENTAS DIRETAS (FALLBACK) ──────────────────────────
+
+# ─── MODO 2: FALLBACK MOVIEPY + PEXELS (GARANTIDO) ───────────────────
 
 async def run_fallback_pipeline(
     script_text: str,
@@ -230,22 +217,21 @@ async def run_fallback_pipeline(
     voice_path: str,
     output_path: str,
     provider: str = "nvidia",
+    video_format: str = "vertical",
 ) -> Dict[str, Any]:
     """
-    Pipeline fallback que usa MoviePy + Pexels diretamente
-    (sem depender do Remotion/OpenMontage).
-
-    Este modo é usado quando o OpenMontage não está disponível ou
-    quando o Remotion falha.
+    Pipeline fallback que usa MoviePy + Pexels.
+    Funciona sem OpenMontage — é a garantia de que algo sempre será produzido.
     """
     try:
-        # Importa os módulos existentes da Dezafira
         from modules.pexels_client import PexelsClient
         from orchestrator import assemble_video
 
         pexels = PexelsClient()
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
         # Baixar clipes do Pexels
+        orientation = "portrait" if video_format == "vertical" else "landscape"
         downloaded_clips = []
         if pexels.api_key and visual_keywords:
             for keyword in visual_keywords[:3]:
@@ -253,9 +239,13 @@ async def run_fallback_pipeline(
                     query=keyword,
                     count=2,
                     output_dir=os.path.join(OUTPUTS_DIR, "temp"),
-                    orientation="portrait",
+                    orientation=orientation,
                 )
                 downloaded_clips.extend(clips)
+                if len(downloaded_clips) >= 4:
+                    break
+
+        print(f"[Fallback] {len(downloaded_clips)} clipes baixados do Pexels")
 
         # Montar vídeo com MoviePy
         if downloaded_clips:
@@ -268,8 +258,10 @@ async def run_fallback_pipeline(
                 target_format="vertical",
             )
         else:
+            # Sem clipes — criar vídeo apenas com áudio + legendas
+            print("[Fallback] Sem clipes disponíveis. Gerando vídeo com áudio apenas.")
             assemble_video(
-                video_path=voice_path,  # fallback: só áudio
+                video_path=voice_path,
                 voice_path=voice_path,
                 output_path=output_path,
                 add_subtitles=True,
@@ -277,26 +269,28 @@ async def run_fallback_pipeline(
 
         if os.path.exists(output_path):
             size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            print("[Fallback] Video produzido: {} ({:.1f}MB)".format(output_path, size_mb))
             return {
                 "success": True,
                 "output_path": output_path,
                 "size_mb": round(size_mb, 1),
-                "mode": "fallback",
-            }
-        else:
-            return {
-                "success": False,
-                "error": "Falha na montagem do vídeo fallback.",
-                "output_path": None,
-                "mode": "fallback",
+                "mode": "moviepy_fallback",
             }
 
+        return {
+            "success": False,
+            "error": "Montagem concluída mas arquivo não encontrado.",
+            "output_path": None,
+            "mode": "moviepy_fallback",
+        }
+
     except Exception as e:
+        print("[Fallback] Erro: {}".format(e))
         return {
             "success": False,
             "error": f"Fallback pipeline falhou: {str(e)}",
             "output_path": None,
-            "mode": "fallback",
+            "mode": "moviepy_fallback",
         }
 
 
@@ -314,22 +308,9 @@ async def produce_video(
 ) -> Dict[str, Any]:
     """
     Função principal de produção de vídeo.
-
-    1. Tenta OpenMontage + Remotion primeiro (modo FULL_PIPELINE)
-    2. Se falhar, tenta MoviePy + Pexels (fallback)
-
-    Args:
-        task_id: ID da task no banco
-        prompt: Tema do vídeo
-        script_text: Texto do roteiro
-        visual_keywords: Palavras-chave visuais
-        voice_path: Caminho do áudio gerado
-        channel_id: ID do canal
-        provider: 'nvidia' ou 'deepseek'
-        video_format: 'vertical' ou 'horizontal'
-
-    Returns:
-        Dict com resultado da operação
+    
+    1. Tenta OpenMontage + Remotion (motor principal)
+    2. Se falhar, usa MoviePy + Pexels (fallback garantido)
     """
     project_id = f"task_{task_id}"
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
@@ -337,43 +318,43 @@ async def produce_video(
 
     output_path = os.path.join(OUTPUTS_DIR, f"{project_id}_preview.mp4")
 
-    print(f"\n[OpenMontageBridge] Produzindo vídeo para task {task_id}")
-    print(f"[OpenMontageBridge] Prompt: {prompt}")
-    print(f"[OpenMontageBridge] Provider: {provider}")
+    print(f"\n{'='*50}")
+    print(f"[OpenMontageBridge] Produzindo vídeo para task {task_id}")
+    print(f"[OpenMontageBridge] Prompt: {prompt[:60]}...")
+    print(f"[OpenMontageBridge] Keywords: {visual_keywords[:3]}")
+    print(f"{'='*50}")
 
-    # ── TENTATIVA 1: OpenMontage Pipeline ──────────────
+    # ── TENTATIVA 1: OpenMontage Pipeline (MOTOR PRINCIPAL) ──────
     if is_open_montage_available():
-        print("[OpenMontageBridge] OpenMontage disponível. Tentando pipeline Remotion...")
-
-        montage_result = await run_open_montage_pipeline(
+        print("\n[1/2] Tentando OpenMontage + Remotion...")
+        result = await run_open_montage_pipeline(
             prompt=prompt,
             output_path=output_path,
             provider=provider,
             duration_seconds=45,
         )
+        if result.get("success"):
+            result["mode"] = "open_montage"
+            return result
+        print("[1/2] OpenMontage falhou: {}".format(result.get('error')))
 
-        if montage_result.get("success"):
-            montage_result["mode"] = "open_montage"
-            return montage_result
-
-        print(f"[OpenMontageBridge] Remotion falhou: {montage_result.get('error')}")
-
-    # ── TENTATIVA 2: Fallback MoviePy + Pexels ─────────
-    print("[OpenMontageBridge] Usando pipeline fallback (MoviePy + Pexels)...")
-    return await run_fallback_pipeline(
+    # ── TENTATIVA 2: MoviePy + Pexels (FALLBACK GARANTIDO) ──────
+    print("\n[2/2] Usando MoviePy + Pexels (fallback)...")
+    result = await run_fallback_pipeline(
         script_text=script_text,
         visual_keywords=visual_keywords,
         voice_path=voice_path,
         output_path=output_path,
         provider=provider,
+        video_format=video_format,
     )
+    return result
 
 
 # ─── UTILITÁRIOS ──────────────────────────────────────────────────────
 
 def _find_command(*names: str) -> Optional[str]:
     """Encontra um comando no PATH."""
-    import shutil
     for name in names:
         resolved = shutil.which(name)
         if resolved:
@@ -388,11 +369,8 @@ def ensure_output_dirs() -> None:
 
 
 if __name__ == "__main__":
-    # Teste rápido
-    print("=== OpenMontage Bridge - Status ===\n")
+    print("=== OpenMontage Bridge — Status ===\n")
     status = get_open_montage_status()
     for k, v in status.items():
         print(f"  {k}: {v}")
-
-    print(f"\nOpenMontage instalado: {status['installed']}")
-    print(f"Remotion configurado: {status['remotion_available']}")
+    print(f"\nModo ativo: {status['mode']}")
