@@ -11,6 +11,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 
 HERMES_HOME = os.environ.get("HERMES_HOME", "/opt/data")
+PORT = int(os.environ.get("PORT", "9119"))
 GATEWAY_CMD = ["/opt/hermes/.venv/bin/hermes", "gateway"]
 
 
@@ -39,8 +40,8 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 def run_health_server():
     try:
-        server = HTTPServer(("0.0.0.0", 9119), HealthHandler)
-        print("[Dezafira] Healthcheck server rodando em 0.0.0.0:9119")
+        server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
+        print(f"[Dezafira] Healthcheck server rodando em 0.0.0.0:{PORT}")
         sys.stdout.flush()
         server.serve_forever()
     except Exception as e:
