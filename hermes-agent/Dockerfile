@@ -54,6 +54,7 @@ RUN mkdir -p /workspace/tools /workspace/outputs
 
 # Copiar ferramentas Dezafira
 COPY tools/ /workspace/tools/
+COPY config.yaml /workspace/config.yaml
 COPY setup_dezafira.py /workspace/setup_dezafira.py
 COPY start.sh /workspace/start.sh
 RUN chmod +x /workspace/start.sh
