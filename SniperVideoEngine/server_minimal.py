@@ -80,7 +80,7 @@ async def query_llm(messages: List[Dict[str, str]]) -> str:
     # 2. NVIDIA
     if nvidia_key:
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=90.0) as client:
                 response = await client.post(
                     "https://integrate.api.nvidia.com/v1/chat/completions",
                     headers={
@@ -88,7 +88,7 @@ async def query_llm(messages: List[Dict[str, str]]) -> str:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "meta/llama-3.3-70b-instruct",
+                        "model": "meta/llama-3.1-8b-instruct",
                         "messages": messages,
                         "temperature": 0.7,
                         "max_tokens": 1024

@@ -61,12 +61,12 @@ class SniperBrain:
                     "Authorization": f"Bearer {self.nvidia_key}"
                 }
                 payload = {
-                    "model": "meta/llama-3.1-70b-instruct",
+                    "model": "meta/llama-3.1-8b-instruct",
                     "messages": messages,
                     "temperature": temperature,
                     "max_tokens": 1500
                 }
-                response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=60.0)
+                response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=90.0)
                 if response.status_code == 200:
                     self.last_provider_used = "nvidia"
                     print("[LLM] NVIDIA respondeu com sucesso!")
