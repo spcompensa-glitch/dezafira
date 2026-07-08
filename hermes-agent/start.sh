@@ -22,4 +22,5 @@ echo "[Dezafira] Porta: 9119"
 echo "[Dezafira] Health check: /v1/models"
 
 # Iniciar Nous Hermes Agent em modo gateway
-exec /opt/hermes/.venv/bin/python -m hermes_cli gateway run
+echo "[Dezafira] Iniciando gateway via hermes CLI..."
+exec /opt/hermes/.venv/bin/hermes gateway start --foreground
