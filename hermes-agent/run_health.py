@@ -3,6 +3,7 @@
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -11,7 +12,6 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 
 HERMES_HOME = os.environ.get("HERMES_HOME", "/opt/data")
-PORT = int(os.environ.get("PORT", "9119"))
 GATEWAY_CMD = ["/opt/hermes/.venv/bin/hermes", "gateway"]
 
 
@@ -38,14 +38,14 @@ class HealthHandler(BaseHTTPRequestHandler):
         pass
 
 
-def run_health_server():
+def run_server(port):
     try:
-        server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
-        print(f"[Dezafira] Healthcheck server rodando em 0.0.0.0:{PORT}")
+        server = HTTPServer(("0.0.0.0", port), HealthHandler)
+        print(f"[Dezafira] Healthcheck em 0.0.0.0:{port}")
         sys.stdout.flush()
         server.serve_forever()
     except Exception as e:
-        print(f"[Dezafira] ERRO healthcheck server: {e}", file=sys.stderr)
+        print(f"[Dezafira] ERRO porta {port}: {e}", file=sys.stderr)
         sys.stderr.flush()
 
 
@@ -53,9 +53,21 @@ def main():
     print("[Dezafira] Iniciando healthcheck server...")
     sys.stdout.flush()
 
-    t = threading.Thread(target=run_health_server, daemon=True)
-    t.start()
-    time.sleep(0.5)
+    # Listen on PORT env (Railway default) AND 9119 (our default)
+    ports_to_listen = set()
+    ports_to_listen.add(9119)
+    railway_port = os.environ.get("PORT")
+    if railway_port:
+        ports_to_listen.add(int(railway_port))
+
+    print(f"[Dezafira] Portas: {sorted(ports_to_listen)}")
+    sys.stdout.flush()
+
+    for port in ports_to_listen:
+        t = threading.Thread(target=run_server, args=(port,), daemon=True)
+        t.start()
+
+    time.sleep(1)
 
     print("[Dezafira] Iniciando Hermes gateway...")
     sys.stdout.flush()
@@ -78,12 +90,10 @@ def main():
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
 
-    # Keep running while gateway is alive (or indefinitely)
     while True:
         if proc.poll() is not None:
             print(f"[Dezafira] Gateway encerrou (código {proc.returncode})")
             sys.stdout.flush()
-            # Restart gateway
             print("[Dezafira] Reiniciando gateway...")
             sys.stdout.flush()
             proc = subprocess.Popen(
