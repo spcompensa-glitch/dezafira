@@ -24,6 +24,20 @@ app.add_middleware(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# HERMES ORCHESTRATOR (Unified Pipeline)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class _StubWSHub:
+    """Stub WebSocket hub for server_minimal (no real WS connections)."""
+    async def broadcast(self, event_type, data):
+        pass
+    async def send_to_task(self, task_id, event_type, data):
+        pass
+
+from pipeline.orchestrator import HermesOrchestrator
+_hermes_orchestrator = HermesOrchestrator(_StubWSHub())
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # LLM LOGS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -229,14 +243,15 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
             theme = "Tema genérico"
         try:
             from modules.database import create_automation_task
-            from modules.swarm_agents import agent_triage
             
             task_v_id = create_automation_task(f"{theme} (Vertical)", channel_id or "default")
             task_h_id = create_automation_task(f"{theme} (Horizontal)", channel_id or "default")
             
             if background_tasks:
-                background_tasks.add_task(agent_triage, task_v_id, theme, channel_id or "default", "vertical")
-                background_tasks.add_task(agent_triage, task_h_id, theme, channel_id or "default", "horizontal")
+                async def _run_pipeline(task_id, theme, channel_id, video_format):
+                    await _hermes_orchestrator.start_pipeline(theme, channel_id, video_format, task_id=str(task_id))
+                background_tasks.add_task(_run_pipeline, task_v_id, theme, channel_id or "default", "vertical")
+                background_tasks.add_task(_run_pipeline, task_h_id, theme, channel_id or "default", "horizontal")
             
             return (
                 f"🚀 PRODUZINDO 2 VÍDEOS!\n\n"
@@ -254,11 +269,12 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
     if theme and any(p in msg for p in video_patterns):
         try:
             from modules.database import create_automation_task
-            from modules.swarm_agents import agent_triage
             
             task_id = create_automation_task(theme, channel_id or "default")
             if background_tasks:
-                background_tasks.add_task(agent_triage, task_id, theme, channel_id or "default", "vertical")
+                async def _run_pipeline_single(task_id, theme, channel_id, video_format):
+                    await _hermes_orchestrator.start_pipeline(theme, channel_id, video_format, task_id=str(task_id))
+                background_tasks.add_task(_run_pipeline_single, task_id, theme, channel_id or "default", "vertical")
             
             return (
                 f"🚀 PRODUZINDO VÍDEO!\n\n"
@@ -289,11 +305,12 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
                 
                 try:
                     from modules.database import create_automation_task
-                    from modules.swarm_agents import agent_triage
                     
                     task_id = create_automation_task(theme, channel_id or "default")
                     if background_tasks:
-                        background_tasks.add_task(agent_triage, task_id, theme, channel_id or "default", "vertical")
+                        async def _run_pipeline_confirm(task_id, theme, channel_id, video_format):
+                            await _hermes_orchestrator.start_pipeline(theme, channel_id, video_format, task_id=str(task_id))
+                        background_tasks.add_task(_run_pipeline_confirm, task_id, theme, channel_id or "default", "vertical")
                     
                     return (
                         f"🚀 CONFIRMADO! Produzindo vídeo sobre:\n\n📝 {theme}\n\nAcompanhe na aba Fábrica de Canais!",
@@ -374,11 +391,12 @@ NÃO explique processos. NÃO descreva etapas. EXECUTE."""
         if theme:
             try:
                 from modules.database import create_automation_task
-                from modules.swarm_agents import agent_triage
                 
                 task_id = create_automation_task(theme, channel_id or "default")
                 if background_tasks:
-                    background_tasks.add_task(agent_triage, task_id, theme, channel_id or "default", "vertical")
+                    async def _run_pipeline_exec(task_id, theme, channel_id, video_format):
+                        await _hermes_orchestrator.start_pipeline(theme, channel_id, video_format, task_id=str(task_id))
+                    background_tasks.add_task(_run_pipeline_exec, task_id, theme, channel_id or "default", "vertical")
                 
                 return (
                     f"🚀 Executando! Produzindo vídeo sobre:\n\n📝 {theme}\n\nAcompanhe na aba Fábrica de Canais!",
@@ -418,13 +436,14 @@ async def create_prediction(payload: PredictionCreate, background_tasks: Backgro
     
     try:
         from modules.database import create_automation_task, save_db_prediction
-        from modules.swarm_agents import agent_triage
         
         task_id = create_automation_task(payload.prompt, payload.channel_id or "default")
         save_db_prediction(prediction_id, payload.prompt, payload.channel_id or "default")
         
         if background_tasks:
-            background_tasks.add_task(agent_triage, task_id, payload.prompt, payload.channel_id or "default", payload.video_format)
+            async def _run_pipeline_pred(task_id, prompt, channel_id, video_format):
+                await _hermes_orchestrator.start_pipeline(prompt, channel_id, video_format, task_id=str(task_id))
+            background_tasks.add_task(_run_pipeline_pred, task_id, payload.prompt, payload.channel_id or "default", payload.video_format)
         
         return {"id": prediction_id, "status": "starting", "message": "Geração iniciada!"}
     except Exception as e:

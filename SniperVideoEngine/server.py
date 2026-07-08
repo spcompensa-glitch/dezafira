@@ -149,10 +149,12 @@ async def create_prediction(payload: CreatePredictionPayload, background_tasks: 
     save_db_prediction(prediction_id, payload.prompt, payload.channel_id)
     
     from modules.database import create_automation_task
-    from modules.swarm_agents import agent_triage
     task_id = create_automation_task(payload.prompt, payload.channel_id)
+    
+    async def _run_orchestrator(task_id, prompt, channel_id, video_format):
+        await _hermes_orchestrator.start_pipeline(prompt, channel_id, video_format, task_id=str(task_id))
     background_tasks.add_task(
-        agent_triage, task_id, payload.prompt,
+        _run_orchestrator, task_id, payload.prompt,
         payload.channel_id, payload.video_format
     )
     
@@ -487,12 +489,11 @@ async def startup_event():
         asyncio.set_event_loop(loop)
         try:
             from modules.database import create_automation_task
-            from modules.swarm_agents import agent_triage
             
             task_id = create_automation_task(theme_text, "default")
             save_db_prediction(f"tele_{uuid.uuid4().hex[:8]}", theme_text, "default")
             
-            loop.run_until_complete(agent_triage(task_id, theme_text, "default", "vertical"))
+            loop.run_until_complete(_hermes_orchestrator.start_pipeline(theme_text, "default", "vertical", task_id=str(task_id)))
         except Exception as e:
             print(f"[Telegram Bot] Falha na esteira disparada por chat: {str(e)}")
         finally:
@@ -1156,7 +1157,6 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
         
         try:
             from modules.database import create_automation_task
-            from modules.swarm_agents import agent_triage
             
             # Geração do formato Vertical (9:16)
             task_v_id = create_automation_task(f"{theme} (Vertical)", channel_id or "default")
@@ -1169,13 +1169,17 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
             save_db_prediction(pred_h_id, f"{theme} (Horizontal)", channel_id or "default")
             
             if background_tasks:
+                async def _run_orchestrator_v(task_id, theme, channel_id):
+                    await _hermes_orchestrator.start_pipeline(theme, channel_id, "vertical", task_id=str(task_id))
+                async def _run_orchestrator_h(task_id, theme, channel_id):
+                    await _hermes_orchestrator.start_pipeline(theme, channel_id, "horizontal", task_id=str(task_id))
                 background_tasks.add_task(
-                    agent_triage, task_v_id, theme,
-                    channel_id or "default", "vertical"
+                    _run_orchestrator_v, task_v_id, theme,
+                    channel_id or "default"
                 )
                 background_tasks.add_task(
-                    agent_triage, task_h_id, theme,
-                    channel_id or "default", "horizontal"
+                    _run_orchestrator_h, task_h_id, theme,
+                    channel_id or "default"
                 )
                 
             action_data = {
@@ -1208,16 +1212,17 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
         
         try:
             from modules.database import create_automation_task
-            from modules.swarm_agents import agent_triage
             
             task_id = create_automation_task(theme, channel_id or "default")
             prediction_id = f"sniper_hf_{uuid.uuid4().hex[:6]}"
             save_db_prediction(prediction_id, theme, channel_id or "default")
             
             if background_tasks:
+                async def _run_orchestrator_single(task_id, theme, channel_id):
+                    await _hermes_orchestrator.start_pipeline(theme, channel_id, "vertical", task_id=str(task_id))
                 background_tasks.add_task(
-                    agent_triage, task_id, theme,
-                    channel_id or "default", "vertical"
+                    _run_orchestrator_single, task_id, theme,
+                    channel_id or "default"
                 )
             
             action_data = {
