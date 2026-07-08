@@ -10,6 +10,7 @@ class SniperBrain:
     def __init__(self):
         self.nvidia_key = os.getenv("NVIDIA_API_KEY")
         self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "brand_config")
+        self.last_provider_used = "nvidia"
 
     def _read_config_file(self, filename):
         file_path = os.path.join(self.config_dir, filename)
@@ -29,7 +30,7 @@ class SniperBrain:
                 "Authorization": f"Bearer {self.nvidia_key}"
             }
             payload = {
-                "model": "meta/llama-3.3-70b-instruct",
+                "model": "meta/llama-3.1-70b-instruct",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -37,16 +38,44 @@ class SniperBrain:
                 "temperature": temperature,
                 "max_tokens": 1500
             }
-            response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=25.0)
+            response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=60.0)
             if response.status_code == 200:
+                self.last_provider_used = "nvidia"
                 return response.json()["choices"][0]["message"]["content"]
             else:
                 raise Exception(f"Nvidia NIM retornou status {response.status_code}: {response.text[:200]}")
         except Exception as e:
-            print(f"[LLM] Erro ao chamar Nvidia NIM: {e}")
-            raise
+            print(f"[LLM] Erro ao chamar Nvidia NIM: {e}. Tentando fallback com DeepSeek...")
+            deepseek_key = os.getenv("DEEPSEEK_API_KEY")
+            if deepseek_key:
+                try:
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {deepseek_key}"
+                    }
+                    payload = {
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "temperature": temperature,
+                        "max_tokens": 1500
+                    }
+                    response = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60.0)
+                    if response.status_code == 200:
+                        self.last_provider_used = "deepseek"
+                        print("[LLM] Fallback com DeepSeek concluído com sucesso!")
+                        return response.json()["choices"][0]["message"]["content"]
+                    else:
+                        raise Exception(f"DeepSeek retornou status {response.status_code}: {response.text[:200]}")
+                except Exception as ds_err:
+                    print(f"[LLM] Falha no fallback com DeepSeek: {ds_err}")
+                    raise Exception(f"Ambos Nvidia NIM e DeepSeek falharam. Erro original: {e}, Erro DeepSeek: {ds_err}")
+            else:
+                raise e
 
-    def generate_script(self, theme, brand="Geral", trends_context="", channel_context=""):
+    def generate_script(self, theme, brand="Geral", trends_context="", channel_context="", target_duration=45):
         """Gera o roteiro, titulo, prompts visuais e clima musical unificados para a Dezafira em JSON
 
         Args:
@@ -54,21 +83,42 @@ class SniperBrain:
             brand: Nicho/marca
             trends_context: Contexto de tendências do YouTube
             channel_context: Contexto do Shared Memory (channel_knowledge) para personalização
+            target_duration: Duração alvo em segundos (default 45s para Shorts)
         """
         brand_bible = self._read_config_file("brand_bible.md")
         target_audience = self._read_config_file("target_audience.md")
         voice_guide = self._read_config_file("voice_guide.md")
         
+        # Calcular palavras necessárias baseado na duração
+        # Português: ~150 palavras/minuto = ~2.5 palavras/segundo
+        words_needed = int(target_duration * 2.5)
+        # Adicionar margem de 20% para garantir
+        words_target = int(words_needed * 1.2)
+        
+        # Determinar tipo de vídeo baseado na duração
+        if target_duration <= 60:
+            video_type = "Shorts/TikTok (40-60 segundos)"
+            max_words = 150
+        elif target_duration <= 180:
+            video_type = "Vídeo curto (2-3 minutos)"
+            max_words = 450
+        elif target_duration <= 300:
+            video_type = "Vídeo médio (5 minutos)"
+            max_words = 750
+        else:
+            video_type = "Vídeo longo (10+ minutos)"
+            max_words = 1500
+        
         system_prompt = """
-        Voce e o Roteirista e Diretor Executivo da Dezafira, especialista em criar videos curtos altamente virais de alta conversao (para YouTube Shorts/TikTok).
+        Voce e o Roteirista e Diretor Executivo da Dezafira, especialista em criar videos de alta conversao para YouTube.
 
         === REGRAS DE GROWTH HACKING (OBRIGATÓRIAS) ===
         1. HOOK IMPLACÁVEL: Os primeiros 3 segundos DEVEM prender a atenção. 
            NUNCA comece com "Olá pessoal", "Bem-vindos", "Neste vídeo vou mostrar" ou introduções lentas.
            Comece direto no ápice do assunto: um fato intrigante, uma pergunta provocativa ou uma quebra de expectativa.
 
-        2. RITMO VISUAL: Nenhuma cena deve durar mais de 2.5 segundos.
-           Alterne palavras-chave visuais para manter o ritmo frenético.
+        2. RITMO VISUAL: Nenhuma cena deve durar mais de 3 segundos.
+           Alterne palavras-chave visuais para manter o ritmo.
 
         3. TÍTULO MAGNÉTICO: Use a fórmula [Gatilho de Curiosidade] + [Fato Inesperado].
            Ex: "A mentira que te contaram sobre..." ao invés de "História de..."
@@ -76,6 +126,10 @@ class SniperBrain:
 
         4. ESTRUTURA: Uma ideia por frase. Sem repetir o mesmo conceito.
            Cada frase deve obrigar o espectador a querer ouvir a próxima.
+
+        5. EXTENSÃO DO ROTEIRO: O roteiro DEVE ter EXATAMENTE {words_target} palavras (±10%).
+           NÃO gere scripts curtos! Se precisar, adicione mais detalhes, exemplos, dados, histórias.
+           Um vídeo de {target_duration} segundos precisa de MUITO texto para preencher o tempo.
 
         === DIRETRIZES DO CANAL ===
         Use as diretrizes abaixo para formatar o tom de voz e estilo do roteiro:
@@ -88,7 +142,7 @@ class SniperBrain:
 
         [VOICE GUIDE]
         {}
-        """.format(brand_bible, target_audience, voice_guide)
+        """.format(brand_bible, target_audience, voice_guide, words_target=words_target, target_duration=target_duration)
         
         # Adicionar contexto do Shared Memory se disponível
         memory_block = ""
@@ -103,23 +157,29 @@ class SniperBrain:
         Gere um plano de video completo em formato JSON para o tema: "{}" (Nicho: {}).
         {}
         {}
-        O video deve ter alta retencao nos primeiros 3 segundos e seguir as diretrizes do YouTube contra conteudo reutilizado (crie um roteiro profundo, autoral e com forte storytelling).
+        
+        IMPORTANTE: Este é um {video_type}.
+        O roteiro DEVE ter EXATAMENTE {words_target} palavras (±10%).
+        Duração alvo: {target_duration} segundos ({minutes} minutos).
 
         LEMBRE-SE: 
         - NUNCA comece com saudações
-        - Máximo 120 palavras para 40-50 segundos
         - Uma ideia por frase
         - Título com gatilho de curiosidade (< 60 chars)
+        - O script deve ser LONGO o suficiente para preencher {target_duration} segundos de narração
+        - Se o script ficar curto, adicione mais exemplos, dados, histórias, detalhes
 
         Retorne estritamente um objeto JSON com o seguinte formato, sem blocos de texto explicativos adicionais antes ou depois:
         {{
             "title": "Titulo com gatilho de curiosidade e menos de 60 caracteres",
-            "script": "Texto corrido que sera narrado (maximo 120 palavras para 40-50s). Comece direto no assunto, sem introduções.",
-            "visual_prompts": ["Keyword visual em ingles para cena 1", "Keyword visual em ingles para cena 2", "Keyword visual em ingles para cena 3"],
+            "script": "Texto corrido que sera narrado com EXATAMENTE {words_target} palavras. Comece direto no assunto, sem introduções. Adicione detalhes, exemplos, dados para preencher o tempo.",
+            "visual_prompts": ["Keyword visual em ingles para cena 1", "Keyword visual em ingles para cena 2", "Keyword visual em ingles para cena 3", "Keyword visual em ingles para cena 4", "Keyword visual em ingles para cena 5"],
             "music_prompt": "Clima musical sugerido (ex: dark techno, epic motivation, ambient tech)",
-            "target_duration": 45
+            "target_duration": {target_duration}
         }}
-        """.format(theme, brand, trends_block, memory_block)
+        """.format(theme, brand, trends_block, memory_block,
+                   video_type=video_type, words_target=words_target,
+                   target_duration=target_duration, minutes=target_duration//60)
         
         try:
             res_text = self._call_llm(system_prompt, user_prompt, temperature=0.7)
@@ -355,6 +415,186 @@ class SniperBrain:
         3. ATUALIZAÇÕES PARA O VOICE GUIDE (Reescreva apenas os trechos do Voice Guide que precisam ser modificados)
         """
         return self._call_llm(system_prompt, user_prompt, temperature=0.5)
+
+    # ══════════════════════════════════════════════════════════════
+    # NOVAS SKILLS — 6 Prompts do Sistema Dezafira v2 (Gringa)
+    # ══════════════════════════════════════════════════════════════
+
+    def generate_niche_ideas(self, focus_market="Estados Unidos, Canadá, Reino Unido, Austrália"):
+        """
+        PROMPT #1 — Encontre um nicho que realmente dá dinheiro
+        Lista 20 nichos evergreen com alto CPM para o mercado gringo.
+        """
+        system_prompt = """Você é um estrategista de canais YouTube especializado em monetização internacional.
+        Seu foco é encontrar nichos com alto CPM (Cost Per Mille) nos mercados de língua inglesa.
+        Você nunca sugere nichos onde o criador precisa aparecer."""
+        user_prompt = f"""Liste 20 nichos para canais no YouTube onde eu não precise aparecer.
+        Priorize nichos evergreen, com alta demanda nos {focus_market},
+        alto potencial de CPM, possibilidade de produzir vídeos utilizando Inteligência Artificial
+        e baixa dificuldade para monetizar.
+
+        Para cada nicho, informe:
+        - Nome do nicho
+        - CPM médio estimado (USD)
+        - Público-alvo
+        - Facilidade de produção (1-10)
+        - Nota de potencial de crescimento (1-10)
+
+        Retorne em formato JSON com uma lista de 20 itens."""
+        return self._call_llm(system_prompt, user_prompt, temperature=0.7)
+
+    def generate_viral_ideas(self, niche: str, target_audience: str = "American audience"):
+        """
+        PROMPT #2 — Descubra vídeos que já provaram funcionar
+        Gera 30 ideias de vídeos virais para um nicho específico.
+        """
+        system_prompt = """Você é um estrategista especialista em YouTube que entende profundamente
+        o algoritmo e os gatilhos psicológicos que geram milhões de visualizações.
+        Você nunca copia títulos — você entende o formato e cria algo original."""
+        user_prompt = f"""Liste 30 ideias de vídeos inspiradas nos formatos que mais viralizam no nicho: "{niche}".
+
+        Não copie títulos. Para cada ideia, explique:
+        1. Por que tem potencial para gerar milhões de visualizações
+        2. Qual emoção desperta no espectador
+        3. Como deixá-la mais interessante para o {target_audience}
+
+        Retorne em formato JSON com lista de 30 ideias."""
+        return self._call_llm(system_prompt, user_prompt, temperature=0.8)
+
+    def generate_english_script(
+        self,
+        theme: str,
+        duration_minutes: int = 10,
+        brand: str = "Geral",
+        trends_context: str = "",
+    ):
+        """
+        PROMPT #3 — Crie um roteiro com alta retenção (em INGLÊS)
+        Gera roteiro de ~10 minutos em inglês americano com técnicas de retenção.
+        """
+        system_prompt = """You are a top YouTube retention scriptwriter.
+        You write in American English with natural, easy-to-understand language.
+        Your scripts have extreme hooks in the first 10 seconds.
+        You maintain curiosity throughout using questions and gradual revelations.
+        You avoid long introductions.
+        You end by encouraging the viewer to watch another video."""
+        user_prompt = f"""Write a {duration_minutes}-minute retention script about: "{theme}" (Niche: {brand}).
+        {trends_context}
+
+        RULES:
+        - Start with an extremely strong hook in the first 10 seconds
+        - Maintain curiosity throughout using questions and gradual revelations
+        - Avoid long introductions
+        - End by encouraging the viewer to watch another video from the channel
+        - Write in American English, natural and easy to understand
+        - Target approximately {duration_minutes * 150} words
+
+        Return a JSON object:
+        {{
+            "title": "Clickable title with curiosity gap (max 60 chars)",
+            "script": "Full script text in English",
+            "visual_keywords": ["keyword1", "keyword2", ...],
+            "target_duration_seconds": {duration_minutes * 60},
+            "hook": "The first 10-second hook"
+        }}"""
+        return self._call_llm(system_prompt, user_prompt, temperature=0.7)
+
+    def generate_scene_guide(self, script_text: str, title: str):
+        """
+        PROMPT #4 — Transforme o roteiro em um vídeo pronto
+        Cria um guia de edição cena-por-cena com classificação PEXELS ou AI_IMAGE.
+        """
+        system_prompt = """You are a video production director.
+        You break down scripts into individual scenes.
+        For each scene, you decide if it needs:
+        - PEXELS: Generic stock footage that exists on Pexels (nature, city, people working, etc.)
+        - AI_IMAGE: A specific visual concept that needs AI generation (abstract concepts, specific illustrations)
+
+        You organize everything in chronological order with exact timestamps."""
+        user_prompt = f"""Take this script and create a complete scene-by-scene editing guide.
+        Title: "{title}"
+
+        Script:
+        {script_text}
+
+        For each segment, indicate:
+        1. Timestamp (start-end in seconds)
+        2. Narration text for this segment
+        3. Scene type: "PEXELS" or "AI_IMAGE"
+        4. Visual prompt (for Pexels search or AI image generation)
+        5. Duration in seconds
+
+        Return a JSON object with a list of scenes in chronological order:
+        {{
+            "scenes": [
+                {{
+                    "scene_id": 1,
+                    "start_time": 0,
+                    "end_time": 8,
+                    "narration": "text for this segment",
+                    "type": "PEXELS",
+                    "visual_prompt": "search keywords",
+                    "duration": 8
+                }}
+            ]
+        }}"""
+        return self._call_llm(system_prompt, user_prompt, temperature=0.5)
+
+    def generate_titles_thumbnails(self, script_text: str, title: str):
+        """
+        PROMPT #5 — Crie um vídeo impossível de ignorar
+        Gera 20 títulos clicáveis + 10 ideias de miniaturas.
+        """
+        system_prompt = """You are a YouTube CTR optimization specialist.
+        You create curiosity-gap titles and emotion-driven thumbnails
+        that maximize click-through rate in the YouTube algorithm."""
+        user_prompt = f"""Based on this script, create:
+
+        SCRIPT TITLE: {title}
+
+        SCRIPT:
+        {script_text}
+
+        1. 20 highly clickable titles using curiosity triggers
+        2. 10 thumbnail ideas that spark emotion and increase CTR
+
+        For each title, explain why it performs well in the algorithm.
+        For each thumbnail, describe the visual composition, colors, and text overlay.
+
+        Return as JSON:
+        {{
+            "titles": [
+                {{"title": "...", "reason": "...", "expected_ctr_boost": "high/medium/low"}}
+            ],
+            "thumbnails": [
+                {{"description": "...", "emotion": "...", "composition": "..."}}
+            ]
+        }}"""
+        return self._call_llm(system_prompt, user_prompt, temperature=0.8)
+
+    def generate_monetization_plan(self, niche: str, target_market: str = "USA/UK/CA/AU"):
+        """
+        PROMPT #6 — Monte um plano para monetizar rápido
+        Cria um plano de 90 dias para monetizar um canal com IA.
+        """
+        system_prompt = """You are a YouTube growth strategist specialized in helping creators
+        reach monetization requirements as fast as possible using AI tools.
+        You create detailed daily action plans."""
+        user_prompt = f"""Create a 90-day monetization plan for a YouTube channel in the niche: "{niche}".
+        Target market: {target_market}
+        Constraint: Use AI tools, no face appearing.
+
+        Include:
+        1. Daily production routine
+        2. Ideal number of videos per week
+        3. View goals and milestones
+        4. Strategies to increase retention, CTR, and watch time
+        5. Common mistakes to avoid
+        6. Actionable checklist for each week
+
+        Return as a structured JSON object with weekly breakdowns."""
+        return self._call_llm(system_prompt, user_prompt, temperature=0.7)
+
 
 if __name__ == "__main__":
     # Teste rápido de integração com LLM
