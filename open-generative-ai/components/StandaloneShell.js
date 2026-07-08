@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ImageStudio, VideoStudio, ClippingStudio, VibeMotionStudio, LipSyncStudio, CinemaStudio, AudioStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, FactoryStudio, HermesChatStudio, getUserBalance } from 'studio';
+import { ImageStudio, VideoStudio, ClippingStudio, VibeMotionStudio, LipSyncStudio, CinemaStudio, AudioStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, FactoryStudio, HermesChatStudio, MemoryGalaxy, getUserBalance } from 'studio';
 
 const DesignAgentStudio = dynamic(() => import('studio').then(mod => mod.DesignAgentStudio), {
   ssr: false,
@@ -16,6 +16,7 @@ const TABS = [
   { id: 'factory', label: 'Fábrica de Canais' },
   { id: 'miniapps', label: 'Fábrica de MiniApps' },
   { id: 'hermes', label: 'Hermes' },
+  { id: 'memory', label: 'Memória Galáxia' },
 ];
 
 const STORAGE_KEY = 'muapi_key';
@@ -430,6 +431,7 @@ export default function StandaloneShell() {
           {activeTab === 'factory' && <FactoryStudio apiKey={apiKey} />}
           {activeTab === 'miniapps' && <AppsStudio apiKey={apiKey} />}
           {activeTab === 'hermes' && <HermesChatStudio apiKey={apiKey} />}
+          {activeTab === 'memory' && <MemoryGalaxy />}
         </div>
       </div>
 

@@ -1,0 +1,142 @@
+[
+  {
+    "id": "proj-dezafira",
+    "label": "Dezafira Factory",
+    "content": "Fábrica automatizada de canais YouTube. Objetivo: 50 canais monetizados com vídeos 100% autônomos. Budget: $0. Stack: NVIDIA LLM, Edge-TTS, OpenMontage, Pexels.",
+    "type": "project",
+    "tags": ["dezafira", "youtube", "automação", "fábrica"],
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["mem-llm-nvidia", "skill-produzir-video", "mem-canal-reino"]
+  },
+  {
+    "id": "mem-llm-nvidia",
+    "label": "LLM: NVIDIA NIM",
+    "content": "Provider primário de LLM: NVIDIA NIM com Llama 3.1 8B Instruct. API key configurada. Fallback: DeepSeek. Timeout: 90s.",
+    "type": "memory",
+    "tags": ["llm", "nvidia", "api", "configuração"],
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "mem-llm-deepseek"]
+  },
+  {
+    "id": "mem-llm-deepseek",
+    "label": "LLM: DeepSeek Fallback",
+    "content": "Provider de fallback: DeepSeek com modelo deepseek-chat. Ativado quando NVIDIA falha. API key configurada.",
+    "type": "memory",
+    "tags": ["llm", "deepseek", "fallback"],
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["mem-llm-nvidia"]
+  },
+  {
+    "id": "skill-produzir-video",
+    "label": "Skill: Produzir Vídeo",
+    "content": "Comando para produzir vídeo completo: python /workspace/tools/produce_video.py <theme> <channel_id> <format>. Pipeline: Research → Script → SEO → Produce.",
+    "type": "skill",
+    "tags": ["vídeo", "produção", "pipeline", "comando"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "skill-pesquisar", "mem-tts-edge"]
+  },
+  {
+    "id": "skill-pesquisar",
+    "label": "Skill: Pesquisar Nicho",
+    "content": "Comando para pesquisar tendências: python /workspace/tools/research.py <theme>. Retorna score de nicho, nível de competição e vídeos trending.",
+    "type": "skill",
+    "tags": ["pesquisa", "tendências", "nicho"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["skill-produzir-video"]
+  },
+  {
+    "id": "skill-upload",
+    "label": "Skill: Upload YouTube",
+    "content": "Comando para upload: python /workspace/tools/upload.py <video_path> <channel_id> <title>. Upload automático após confirmação de qualidade.",
+    "type": "skill",
+    "tags": ["upload", "youtube", "publicação"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["skill-produzir-video"]
+  },
+  {
+    "id": "mem-tts-edge",
+    "label": "TTS: Edge-TTS",
+    "content": "Text-to-Speech: Edge-TTS v7.2.8 (funciona após upgrade). Kokoro desabilitado (trava). gTTS como fallback final. Voz padrão: pt-BR-FranciscaNeural.",
+    "type": "memory",
+    "tags": ["tts", "edge-tts", "áudio", "narração"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["skill-produzir-video"]
+  },
+  {
+    "id": "mem-canal-reino",
+    "label": "Canal: Reino de Deus",
+    "content": "Nicho de teste atual: vídeos cristãos sobre o Reino de Deus. Formato vertical (Shorts/Reels). Conteúdo: fé, bíblia, ensinos cristãos.",
+    "type": "memory",
+    "tags": ["canal", "cristão", "reino de deus", "nicho"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "mem-preferencias"]
+  },
+  {
+    "id": "mem-preferencias",
+    "label": "Preferências do Usuário",
+    "content": "Christian. Formato: vertical (Shorts). Idioma: Português. Estilo: direto, sem enrolação. Horário preferido: manhã (9h). Nicho: Reino de Deus (teste).",
+    "type": "memory",
+    "tags": ["usuário", "preferências", "christian"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["mem-canal-reino"]
+  },
+  {
+    "id": "sessao-001",
+    "label": "Sessão: Unificação de Pipelines",
+    "content": "Sessão onde unificamos os 3 pipelines competidores (swarm_agents, orchestrator, manager) em um único HermesOrchestrator. Corrigido bug do channel_context.",
+    "type": "session",
+    "tags": ["pipeline", "unificação", "refactor"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "sessao-002"]
+  },
+  {
+    "id": "sessao-002",
+    "label": "Sessão: Correção do TTS",
+    "content": "Sessão onde corrigimos o TTS: desabilitamos Kokoro (trava), atualizamos Edge-TTS para 7.2.8 (funciona), mantivemos gTTS como fallback.",
+    "type": "session",
+    "tags": ["tts", "correção", "edge-tts"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["sessao-001", "mem-tts-edge"]
+  },
+  {
+    "id": "sessao-003",
+    "label": "Sessão: Integração Nous Hermes",
+    "content": "Sessão onde integramos o Nous Hermes Agent como microserviço. Criamos Dockerfile, tool wrappers, API endpoints, e página Memória Galáxia.",
+    "type": "session",
+    "tags": ["hermes", "integração", "microserviço"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "skill-produzir-video"]
+  },
+  {
+    "id": "note-arquitetura",
+    "label": "Arquitetura Final",
+    "content": "Service 1: Dezafira Backend (FastAPI, porta 8000) — Chat + Pipeline. Service 2: Nous Hermes Agent (gateway, porta 9119) — Memória + Shell + Cron. Comunicação: HTTP API.",
+    "type": "note",
+    "tags": ["arquitetura", "deploy", "railway"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "sessao-003"]
+  },
+  {
+    "id": "note-proximos-passos",
+    "label": "Próximos Passos",
+    "content": "1. Testar vídeo (Reino de Deus) e validar qualidade. 2. Medir capacidade (quantos vídeos/dia). 3. Definir nichos e escalar. 4. Upload automático após confirmação.",
+    "type": "note",
+    "tags": ["próximos", "plano", "roadmap"],
+    "createdAt": "2026-07-08T00:00:00Z",
+    "updatedAt": "2026-07-08T00:00:00Z",
+    "connections": ["proj-dezafira", "mem-preferencias"]
+  }
+]

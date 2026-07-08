@@ -15,5 +15,6 @@ export { default as AppsStudio } from './components/AppsStudio';
 export { default as McpCliStudio } from './components/McpCliStudio';
 export { default as FactoryStudio } from './components/FactoryStudio';
 export { default as HermesChatStudio } from './components/HermesChatStudio';
+export { default as MemoryGalaxy } from './components/MemoryGalaxy';
 export { default as CreativeStudio } from './components/CreativeStudio';
 export * from './muapi';

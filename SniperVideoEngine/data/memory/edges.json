@@ -1,0 +1,19 @@
+[
+  {"source": "proj-dezafira", "target": "mem-llm-nvidia", "strength": 0.9, "type": "reference"},
+  {"source": "proj-dezafira", "target": "skill-produzir-video", "strength": 0.95, "type": "contribution"},
+  {"source": "proj-dezafira", "target": "mem-canal-reino", "strength": 0.8, "type": "reference"},
+  {"source": "proj-dezafira", "target": "note-arquitetura", "strength": 0.85, "type": "reference"},
+  {"source": "proj-dezafira", "target": "note-proximos-passos", "strength": 0.8, "type": "link"},
+  {"source": "mem-llm-nvidia", "target": "mem-llm-deepseek", "strength": 0.7, "type": "link"},
+  {"source": "skill-produzir-video", "target": "skill-pesquisar", "strength": 0.85, "type": "contribution"},
+  {"source": "skill-produzir-video", "target": "skill-upload", "strength": 0.8, "type": "contribution"},
+  {"source": "skill-produzir-video", "target": "mem-tts-edge", "strength": 0.75, "type": "reference"},
+  {"source": "mem-canal-reino", "target": "mem-preferencias", "strength": 0.9, "type": "reference"},
+  {"source": "sessao-001", "target": "proj-dezafira", "strength": 0.7, "type": "contribution"},
+  {"source": "sessao-001", "target": "sessao-002", "strength": 0.6, "type": "link"},
+  {"source": "sessao-002", "target": "mem-tts-edge", "strength": 0.8, "type": "reference"},
+  {"source": "sessao-003", "target": "proj-dezafira", "strength": 0.75, "type": "contribution"},
+  {"source": "sessao-003", "target": "skill-produzir-video", "strength": 0.7, "type": "reference"},
+  {"source": "note-arquitetura", "target": "proj-dezafira", "strength": 0.8, "type": "reference"},
+  {"source": "note-proximos-passos", "target": "mem-preferencias", "strength": 0.6, "type": "link"}
+]

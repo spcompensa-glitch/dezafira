@@ -73,6 +73,104 @@ async def root():
     return {"message": "Dezafira Backend API", "version": "2.0"}
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY GRAPH API (Memória Galáxia)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import json as json_module
+
+memory_nodes = []
+memory_edges = []
+
+@app.get("/api/memory/sync")
+async def get_memory_graph():
+    """Retorna nodes e edges do graph de memória."""
+    global memory_nodes, memory_edges
+    
+    # Se vazio, carregar dados iniciais
+    if not memory_nodes:
+        try:
+            nodes_path = os.path.join(os.path.dirname(__file__), "data", "memory", "nodes.json")
+            edges_path = os.path.join(os.path.dirname(__file__), "data", "memory", "edges.json")
+            if os.path.exists(nodes_path):
+                with open(nodes_path, "r", encoding="utf-8") as f:
+                    memory_nodes = json_module.load(f)
+            if os.path.exists(edges_path):
+                with open(edges_path, "r", encoding="utf-8") as f:
+                    memory_edges = json_module.load(f)
+        except Exception as e:
+            print(f"[Memory] Erro ao carregar dados: {e}")
+    
+    return {
+        "nodes": memory_nodes,
+        "edges": memory_edges,
+        "lastSync": datetime.now().isoformat(),
+        "source": "dezafira-backend",
+    }
+
+@app.post("/api/memory/sync")
+async def push_memory_node(payload: dict):
+    """Adiciona ou atualiza um node na memória."""
+    global memory_nodes, memory_edges
+    
+    node = payload.get("node")
+    edges = payload.get("edges", [])
+    
+    if not node:
+        return {"error": "Node data required"}, 400
+    
+    # Atualizar ou adicionar node
+    existing_idx = next((i for i, n in enumerate(memory_nodes) if n["id"] == node["id"]), None)
+    if existing_idx is not None:
+        memory_nodes[existing_idx] = {**memory_nodes[existing_idx], **node, "updatedAt": datetime.now().isoformat()}
+    else:
+        node["createdAt"] = datetime.now().isoformat()
+        node["updatedAt"] = datetime.now().isoformat()
+        memory_nodes.append(node)
+    
+    # Adicionar edges
+    for edge in edges:
+        exists = any(e["source"] == edge["source"] and e["target"] == edge["target"] for e in memory_edges)
+        if not exists:
+            memory_edges.append(edge)
+    
+    # Salvar em disco
+    try:
+        data_dir = os.path.join(os.path.dirname(__file__), "data", "memory")
+        os.makedirs(data_dir, exist_ok=True)
+        with open(os.path.join(data_dir, "nodes.json"), "w", encoding="utf-8") as f:
+            json_module.dump(memory_nodes, f, ensure_ascii=False, indent=2)
+        with open(os.path.join(data_dir, "edges.json"), "w", encoding="utf-8") as f:
+            json_module.dump(memory_edges, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[Memory] Erro ao salvar: {e}")
+    
+    return {"success": True, "nodeId": node["id"], "nodeCount": len(memory_nodes)}
+
+@app.post("/api/memory/search")
+async def search_memory(payload: dict):
+    """Busca semântica na memória."""
+    query = payload.get("query", "").lower()
+    if not query:
+        return {"error": "Query required"}, 400
+    
+    results = []
+    for node in memory_nodes:
+        score = 0
+        if query in node.get("label", "").lower():
+            score += 10
+        if query in node.get("content", "").lower():
+            score += 5
+        for tag in node.get("tags", []):
+            if query in tag.lower():
+                score += 3
+        
+        if score > 0:
+            results.append({"node": node, "score": score})
+    
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return {"results": results[:10], "query": query, "count": len(results)}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # HERMES CHAT
 # ═══════════════════════════════════════════════════════════════════════════════
 
