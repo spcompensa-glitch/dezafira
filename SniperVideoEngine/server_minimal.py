@@ -164,16 +164,69 @@ async def clear_hermes_history():
 
 async def process_hermes_command(message: str, channel_id: str = None, background_tasks: BackgroundTasks = None) -> tuple:
     msg = message.lower().strip()
+    original = message.strip()
     
-    # VIDEO PRODUCTION
-    if any(word in msg for word in ["dois vídeos", "dois videos"]):
-        theme = "O Reino de Deus"
-        for keyword in ["sobre", "tema"]:
-            if keyword in msg:
-                parts = msg.split(keyword)
-                if len(parts) > 1:
-                    theme = parts[1].strip()
-                    break
+    # ═══════════════════════════════════════════════════════════════
+    # COMANDOS DE VÍDEO - Pattern matching flexível
+    # ═══════════════════════════════════════════════════════════════
+    
+    # Detectar intenção de criar vídeo (múltiplos padrões)
+    video_patterns = [
+        "produzir video", "produzir vídeo", "gerar video", "gerar vídeo",
+        "make video", "create video", "criar video", "criar vídeo",
+        "fazer video", "fazer vídeo", "quero um video", "quero um vídeo",
+        "quero criar", "quero gerar", "quero produzir", "quero fazer",
+        "me crie", "me gere", "me faça", "me produza"
+    ]
+    
+    # Detectar se quer dois formatos
+    multi_patterns = ["dois vídeos", "dois videos", "vertical e horizontal", "ambos formatos"]
+    is_multi = any(p in msg for p in multi_patterns)
+    
+    # Detectar se é confirmação (quando Hermes perguntou se quer produzir)
+    confirmation_patterns = ["1", "sim", "quero", "pode ser", "manda", "bora", "vamos", "isso", "exato", "confirmo", "prossiga", "execute"]
+    is_confirmation = msg in confirmation_patterns
+    
+    # Extrair tema de多种形式
+    theme = None
+    theme_patterns = ["sobre ", "tema ", "de ", "que fale sobre ", "que explique ", "que ensine "]
+    
+    for pattern in theme_patterns:
+        if pattern in msg:
+            parts = msg.split(pattern)
+            if len(parts) > 1:
+                theme = parts[1].strip()
+                # Limpar palavras de ligação
+                for cleanup in ["por favor", "pf", "obrigado", "ok", "!", ".", ",", "?"]:
+                    theme = theme.replace(cleanup, "")
+                theme = theme.strip()
+                break
+    
+    # Se não encontrou tema, tentar extrair de outras formas
+    if not theme:
+        # Remover comandos e pegar o resto
+        for cmd in ["produzir video", "gerar video", "criar video", "fazer video", "quero um video"]:
+            if cmd in msg:
+                idx = msg.index(cmd) + len(cmd)
+                theme = msg[idx:].strip().lstrip("sobre de :")
+                break
+    
+    # Se ainda não tem tema mas tem intenção de vídeo, usar mensagem completa
+    if not theme and any(p in msg for p in video_patterns):
+        theme = original
+        # Limpar prefixos comuns
+        for prefix in ["quero ", "por favor ", "pode ", "me "]:
+            if theme.lower().startswith(prefix):
+                theme = theme[len(prefix):]
+    
+    # ═══════════════════════════════════════════════════════════════
+    # EXECUÇÃO DOS COMANDOS
+    # ═══════════════════════════════════════════════════════════════
+    
+    # DOIS VÍDEOS
+    if is_multi or (theme and any(p in msg for p in video_patterns) and ("e horizontal" in msg or "vertical" in msg)):
+        if not theme:
+            theme = "Tema genérico"
         try:
             from modules.database import create_automation_task
             from modules.swarm_agents import agent_triage
@@ -186,19 +239,19 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
                 background_tasks.add_task(agent_triage, task_h_id, theme, channel_id or "default", "horizontal")
             
             return (
-                f"Gerando vídeos sobre '{theme}' em formatos vertical e horizontal!",
+                f"🚀 PRODUZINDO 2 VÍDEOS!\n\n"
+                f"📝 Tema: {theme}\n"
+                f"📱 Vertical (9:16) - Shorts/Reels\n"
+                f"🖥️ Horizontal (16:9) - YouTube\n\n"
+                f"Acompanhe o progresso na aba Fábrica de Canais!",
                 "multi_video",
                 {"theme": theme, "vertical": {"status": "starting"}, "horizontal": {"status": "starting"}}
             )
         except Exception as e:
-            return (f"Erro ao gerar vídeos: {str(e)}", None, None)
+            return (f"❌ Erro ao gerar vídeos: {str(e)}", None, None)
     
-    if any(word in msg for word in ["produzir video", "produzir vídeo", "gerar video", "gerar vídeo", "make video"]):
-        theme = message
-        for prefix in ["produzir video ", "produzir vídeo ", "gerar video ", "gerar vídeo ", "make video "]:
-            if msg.startswith(prefix):
-                theme = message[len(prefix):]
-                break
+    # VÍDEO ÚNICO
+    if theme and any(p in msg for p in video_patterns):
         try:
             from modules.database import create_automation_task
             from modules.swarm_agents import agent_triage
@@ -208,59 +261,133 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
                 background_tasks.add_task(agent_triage, task_id, theme, channel_id or "default", "vertical")
             
             return (
-                f"Iniciando produção do vídeo sobre '{theme}'!",
+                f"🚀 PRODUZINDO VÍDEO!\n\n"
+                f"📝 Tema: {theme}\n"
+                f"📱 Formato: Vertical (9:16)\n\n"
+                f"Acompanhe o progresso na aba Fábrica de Canais!",
                 "video",
                 {"theme": theme, "status": "starting"}
             )
         except Exception as e:
-            return (f"Erro ao produzir vídeo: {str(e)}", None, None)
+            return (f"❌ Erro ao produzir vídeo: {str(e)}", None, None)
     
-    # RESEARCH
-    if any(word in msg for word in ["pesquisar", "research"]):
-        keyword = message
-        for prefix in ["pesquisar ", "research "]:
+    # CONFIRMAÇÕES - Se é uma resposta curta positiva e o contexto sugere vídeo
+    if is_confirmation and len(hermes_chat_history) > 1:
+        last_assistant = [m for m in hermes_chat_history if m["role"] == "assistant"][-1]["content"]
+        if any(word in last_assistant.lower() for word in ["produzir", "gerar", "video", "quero", "testar"]):
+            # Extrair tema da mensagem anterior do usuário
+            last_user = [m for m in hermes_chat_history if m["role"] == "user"]
+            if last_user:
+                last_msg = last_user[-1]["content"].lower()
+                # Tentar extrair tema da última mensagem do usuário
+                for pattern in theme_patterns:
+                    if pattern in last_msg:
+                        theme = last_msg.split(pattern)[1].strip()
+                        break
+                if not theme:
+                    theme = "Tema da conversa anterior"
+                
+                try:
+                    from modules.database import create_automation_task
+                    from modules.swarm_agents import agent_triage
+                    
+                    task_id = create_automation_task(theme, channel_id or "default")
+                    if background_tasks:
+                        background_tasks.add_task(agent_triage, task_id, theme, channel_id or "default", "vertical")
+                    
+                    return (
+                        f"🚀 CONFIRMADO! Produzindo vídeo sobre:\n\n📝 {theme}\n\nAcompanhe na aba Fábrica de Canais!",
+                        "video",
+                        {"theme": theme, "status": "starting"}
+                    )
+                except Exception as e:
+                    return (f"❌ Erro: {str(e)}", None, None)
+    
+    # PESQUISA
+    if any(word in msg for word in ["pesquisar", "research", "analisar nicho", "analise de nicho"]):
+        keyword = theme or message
+        for prefix in ["pesquisar ", "research ", "analisar ", "analise de "]:
             if msg.startswith(prefix):
-                keyword = message[len(prefix):]
+                keyword = msg[len(prefix):]
                 break
         try:
             from research.engine import ResearchEngine
             engine = ResearchEngine()
             result = await engine.research_niche(keyword)
-            return (f"Pesquisa de nicho '{keyword}' concluída!", "research", {"keyword": keyword})
+            return (f"📊 Pesquisa de nicho '{keyword}' concluída!", "research", {"keyword": keyword})
         except Exception as e:
-            return (f"Erro na pesquisa: {str(e)}", None, None)
+            return (f"❌ Erro na pesquisa: {str(e)}", None, None)
     
     # HELP
-    if any(word in msg for word in ["ajuda", "help", "comandos"]):
+    if any(word in msg for word in ["ajuda", "help", "comandos", "o que vc faz", "o que voce faz"]):
         return (
-            "Comandos do Hermes:\n\n"
-            "• produzir video [tema] - Gera vídeo vertical\n"
-            "• dois vídeos sobre [tema] - Gera vertical + horizontal\n"
-            "• pesquisar [tema] - Pesquisa nicho\n"
-            "• help - Esta ajuda",
+            "🤖 COMANDOS DO HERMES:\n\n"
+            "🎬 PRODUÇÃO:\n"
+            "• produzir video [tema]\n"
+            "• dois vídeos sobre [tema]\n"
+            "• criar video de [tema]\n"
+            "• quero um video sobre [tema]\n\n"
+            "📊 PESQUISA:\n"
+            "• pesquisar [tema]\n"
+            "• analisar nicho de [tema]\n\n"
+            "💡 TIP: Pode pedir de forma natural!\n"
+            "\"Quero um vídeo explicando meta cognição\"\n"
+            "\"Crie um vídeo sobre finanças\"",
             None, None
         )
     
-    # FALLBACK - LLM
-    system_prompt = """Você é o Hermes, o cérebro orquestrador da plataforma DEZAFIRA - uma fábrica automatizada de canais YouTube.
+    # FALLBACK - LLM com contexto de ação
+    system_prompt = """Você é o Hermes, orquestrador da DEZAFIRA.
 
-Suas capacidades REAIS no sistema:
-1. PRODUÇÃO DE VÍDEOS: Gerar vídeos completos via Hyperframes (roteiro + narração + edição automática)
-2. GESTÃO DE CANAIS: Criar e gerenciar canais YouTube automatizados
-3. PESQUISA DE NICHO: Analisar tendências e oportunidades de mercado
-4. SEO & THUMBNAILS: Otimizar títulos, descrições e miniaturas para engajamento
-5. UPLOAD AUTOMÁTICO: Postar vídeos diretamente no YouTube via Playwright
-6. FÁBRICA DE MINIAPPS: Criar PWAs interativos (quizzes, landing pages) para monetização
+REGRAS IMPORTANTES:
+1. Se o usuário pedir para CRIAR, GERAR ou PRODUZIR algo (vídeo, conteúdo, etc.), execute imediatamente!
+2. NÃO descreva o que você PODE fazer - FAÇA!
+3. Responda com a ação tomada, não com descrições longas.
+4. Seja DIRETO e EXECUTIVO.
 
-COMANDOS DISPONÍVEIS:
-• "produzir video [tema]" - Gera um vídeo vertical
-• "dois vídeos sobre [tema]" - Gera vertical + horizontal
-• "pesquisar [tema]" - Pesquisa o nicho
-• "criar canal [nicho]" - Cria documentação do canal
+CAPACIDADES REAIS:
+• "produzir video [tema]" → Gera vídeo vertical
+• "dois vídeos sobre [tema]" → Vertical + horizontal
+• "pesquisar [tema]" → Analisa nicho
+• "criar canal [nicho]" → Documentação do canal
 
-Responda de forma DIRETA e EXECUTIVA. Foque no que o sistema DEZAFIRA pode fazer de REAL, não em conceitos genéricos de IA."""
+Se o usuário pedir algo que é um dos comandos acima, responda APENAS com o comando exato para eu executar.
+Exemplo: Usuário "quero vídeo sobre gatos" → Você: "produzir video sobre gatos"
+
+NÃO explique processos. NÃO descreva etapas. EXECUTE."""
     
     response = await query_llm([{"role": "system", "content": system_prompt}, {"role": "user", "content": message}])
+    
+    # Verificar se a LLM respondeu com um comando
+    response_lower = response.lower()
+    if any(p in response_lower for p in video_patterns):
+        # Tentar extrair tema da resposta
+        for pattern in theme_patterns:
+            if pattern in response_lower:
+                theme = response.split(pattern)[1].strip().split("\n")[0]
+                # Limpar tema
+                for cleanup in ['"', "'", ">", "-"]:
+                    theme = theme.replace(cleanup, "")
+                theme = theme.strip()
+                break
+        
+        if theme:
+            try:
+                from modules.database import create_automation_task
+                from modules.swarm_agents import agent_triage
+                
+                task_id = create_automation_task(theme, channel_id or "default")
+                if background_tasks:
+                    background_tasks.add_task(agent_triage, task_id, theme, channel_id or "default", "vertical")
+                
+                return (
+                    f"🚀 Executando! Produzindo vídeo sobre:\n\n📝 {theme}\n\nAcompanhe na aba Fábrica de Canais!",
+                    "video",
+                    {"theme": theme, "status": "starting"}
+                )
+            except Exception as e:
+                return (f"❌ Erro: {str(e)}", None, None)
+    
     return (response, None, None)
 
 # ═══════════════════════════════════════════════════════════════════════════════
