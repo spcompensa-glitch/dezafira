@@ -5,6 +5,7 @@ Health check + Hermes Chat + Video Production
 import os
 import uuid
 import asyncio
+from datetime import datetime
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +22,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LLM LOGS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+llm_logs = []
+active_provider = "none"
+
+def log_llm(provider: str, message: str, tokens: int = 0):
+    global active_provider
+    active_provider = provider
+    llm_logs.append({
+        "provider": provider,
+        "message": message,
+        "tokens": tokens,
+        "time": datetime.now().strftime("%H:%M:%S")
+    })
+    if len(llm_logs) > 50:
+        llm_logs.pop(0)
+
+@app.get("/api/v1/llm/logs")
+async def get_llm_logs():
+    return {"logs": llm_logs[-20:], "active_provider": active_provider}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HEALTH CHECK
@@ -48,38 +72,13 @@ hermes_chat_history = [
 async def query_llm(messages: List[Dict[str, str]]) -> str:
     import httpx
     
-    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     nvidia_key = os.getenv("NVIDIA_API_KEY", "")
     deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
     
-    # 1. OpenRouter
-    if openrouter_key:
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {openrouter_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://dezafira.app",
-                        "X-Title": "Dezafira"
-                    },
-                    json={
-                        "model": "meta-llama/llama-3.3-70b-instruct:free",
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 1024
-                    }
-                )
-                if response.status_code == 200:
-                    print("[LLM] OpenRouter respondeu!")
-                    return response.json()["choices"][0]["message"]["content"]
-        except Exception as e:
-            print(f"[LLM] OpenRouter erro: {e}")
-    
-    # 2. NVIDIA
+    # 1. NVIDIA (Primary)
     if nvidia_key:
         try:
+            log_llm("nvidia", "Tentando NVIDIA NIM...")
             async with httpx.AsyncClient(timeout=90.0) as client:
                 response = await client.post(
                     "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -95,14 +94,19 @@ async def query_llm(messages: List[Dict[str, str]]) -> str:
                     }
                 )
                 if response.status_code == 200:
-                    print("[LLM] NVIDIA respondeu!")
-                    return response.json()["choices"][0]["message"]["content"]
+                    data = response.json()
+                    tokens = data.get("usage", {}).get("total_tokens", 0)
+                    log_llm("nvidia", "NVIDIA respondeu com sucesso!", tokens)
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    log_llm("nvidia", f"NVIDIA falhou: {response.status_code}")
         except Exception as e:
-            print(f"[LLM] NVIDIA erro: {e}")
+            log_llm("nvidia", f"Erro NVIDIA: {str(e)[:50]}")
     
-    # 3. DeepSeek
+    # 2. DeepSeek (Fallback)
     if deepseek_key:
         try:
+            log_llm("deepseek", "Tentando DeepSeek...")
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     "https://api.deepseek.com/chat/completions",
@@ -118,11 +122,16 @@ async def query_llm(messages: List[Dict[str, str]]) -> str:
                     }
                 )
                 if response.status_code == 200:
-                    print("[LLM] DeepSeek respondeu!")
-                    return response.json()["choices"][0]["message"]["content"]
+                    data = response.json()
+                    tokens = data.get("usage", {}).get("total_tokens", 0)
+                    log_llm("deepseek", "DeepSeek respondeu com sucesso!", tokens)
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    log_llm("deepseek", f"DeepSeek falhou: {response.status_code}")
         except Exception as e:
-            print(f"[LLM] DeepSeek erro: {e}")
+            log_llm("deepseek", f"Erro DeepSeek: {str(e)[:50]}")
     
+    log_llm("error", "Todos os provedores falharam")
     return "Erro: Todos os provedores LLM falharam."
 
 @app.post("/api/v1/hermes/chat")
@@ -139,7 +148,8 @@ async def hermes_chat(payload: dict, background_tasks: BackgroundTasks):
         "response": text,
         "action_type": action_type,
         "action_data": action_data,
-        "history": hermes_chat_history[-20:]
+        "history": hermes_chat_history[-20:],
+        "active_provider": active_provider
     }
 
 @app.get("/api/v1/hermes/history")

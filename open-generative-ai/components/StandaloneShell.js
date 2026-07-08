@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ImageStudio, VideoStudio, ClippingStudio, VibeMotionStudio, LipSyncStudio, CinemaStudio, AudioStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, FactoryStudio, CreativeStudio, getUserBalance } from 'studio';
+import { ImageStudio, VideoStudio, ClippingStudio, VibeMotionStudio, LipSyncStudio, CinemaStudio, AudioStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, FactoryStudio, HermesChatStudio, getUserBalance } from 'studio';
 
 const DesignAgentStudio = dynamic(() => import('studio').then(mod => mod.DesignAgentStudio), {
   ssr: false,
@@ -14,8 +14,8 @@ import ApiKeyModal from './ApiKeyModal';
 
 const TABS = [
   { id: 'factory', label: 'Fábrica de Canais' },
-  { id: 'creative-studio', label: 'Estúdio Criativo (Higgsfield)' },
-  { id: 'apps', label: 'Explore Apps' },
+  { id: 'miniapps', label: 'Fábrica de MiniApps' },
+  { id: 'hermes', label: 'Hermes' },
 ];
 
 const STORAGE_KEY = 'muapi_key';
@@ -386,53 +386,11 @@ export default function StandaloneShell() {
 
       {/* Main Content Area */}
       <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden h-full">
-        {/* Se o activeTab for uma das ferramentas clássicas do Higgsfield, mostramos cabeçalho de retorno */}
-        {['image', 'video', 'audio', 'clipping', 'vibe-motion', 'lipsync', 'cinema', 'marketing', 'workflows', 'agents', 'design-agent'].includes(activeTab) && (
-          <div className="flex-shrink-0 h-12 bg-[#0a0a0a] border-b border-white/5 flex items-center px-6 gap-3 z-30">
-            <button 
-              onClick={() => handleTabChange('creative-studio')}
-              className="text-xs font-bold text-white/50 hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-              </svg>
-              <span>Voltar ao Estúdio Criativo</span>
-            </button>
-            <span className="text-white/20">|</span>
-            <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">
-              {activeTab} Tool
-            </span>
-          </div>
-        )}
-
         {/* Studio Content */}
         <div className="flex-1 min-h-0 relative overflow-hidden">
           {activeTab === 'factory' && <FactoryStudio apiKey={apiKey} />}
-          {activeTab === 'creative-studio' && <CreativeStudio onSelectStudio={(id) => handleTabChange(id)} />}
-          
-          {['image', 'video', 'audio', 'clipping', 'vibe-motion', 'lipsync', 'cinema', 'marketing', 'workflows', 'agents', 'design-agent'].includes(activeTab) && !apiKey ? (
-            <div className="w-full h-full flex items-center justify-center p-6 bg-app-bg text-white">
-              <div className="max-w-md w-full">
-                <ApiKeyModal onSave={handleKeySave} />
-              </div>
-            </div>
-          ) : (
-            <>
-              {activeTab === 'image'   && <ImageStudio   apiKey={apiKey} droppedFiles={droppedFiles} onFilesHandled={handleFilesHandled} />}
-              {activeTab === 'video'   && <VideoStudio   apiKey={apiKey} droppedFiles={droppedFiles} onFilesHandled={handleFilesHandled} />}
-              {activeTab === 'clipping' && <ClippingStudio apiKey={apiKey} droppedFiles={droppedFiles} onFilesHandled={handleFilesHandled} />}
-              {activeTab === 'vibe-motion' && <VibeMotionStudio apiKey={apiKey} />}
-              {activeTab === 'lipsync' && <LipSyncStudio apiKey={apiKey} droppedFiles={droppedFiles} onFilesHandled={handleFilesHandled} />}
-              {activeTab === 'cinema'  && <CinemaStudio  apiKey={apiKey} />}
-              {activeTab === 'audio'   && <AudioStudio   apiKey={apiKey} droppedFiles={droppedFiles} onFilesHandled={handleFilesHandled} />}
-              {activeTab === 'marketing' && <MarketingStudio apiKey={apiKey} droppedFiles={droppedFiles} onFilesHandled={handleFilesHandled} />}
-              {activeTab === 'workflows' && <WorkflowStudio apiKey={apiKey} isHeaderVisible={isHeaderVisible} onToggleHeader={setIsHeaderVisible} />}
-              {activeTab === 'agents' && <AgentStudio apiKey={apiKey} isHeaderVisible={isHeaderVisible} onToggleHeader={setIsHeaderVisible} />}
-              {activeTab === 'design-agent' && <DesignAgentStudio apiKey={apiKey} isHeaderVisible={isHeaderVisible} onToggleHeader={setIsHeaderVisible} />}
-            </>
-          )}
-          {activeTab === 'apps' && <AppsStudio apiKey={apiKey} />}
+          {activeTab === 'miniapps' && <AppsStudio apiKey={apiKey} />}
+          {activeTab === 'hermes' && <HermesChatStudio apiKey={apiKey} />}
         </div>
       </div>
 

@@ -8,7 +8,6 @@ load_dotenv()
 
 class SniperBrain:
     def __init__(self):
-        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
         self.nvidia_key = os.getenv("NVIDIA_API_KEY")
         self.deepseek_key = os.getenv("DEEPSEEK_API_KEY")
         self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "brand_config")
@@ -22,38 +21,13 @@ class SniperBrain:
         return f"[Arquivo {filename} não configurado. Por favor, adicione as diretrizes.]"
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7):
-        """Chama o LLM com fallback: OpenRouter → NVIDIA → DeepSeek."""
+        """Chama o LLM com fallback: NVIDIA → DeepSeek."""
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
         
-        # 1. Tenta OpenRouter (mais barato e rápido)
-        if self.openrouter_key:
-            try:
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.openrouter_key}",
-                    "HTTP-Referer": "https://dezafira.app",
-                    "X-Title": "Dezafira"
-                }
-                payload = {
-                    "model": "meta-llama/llama-3.3-70b-instruct:free",
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": 1500
-                }
-                response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60.0)
-                if response.status_code == 200:
-                    self.last_provider_used = "openrouter"
-                    print("[LLM] OpenRouter respondeu com sucesso!")
-                    return response.json()["choices"][0]["message"]["content"]
-                else:
-                    print(f"[LLM] OpenRouter retornou status {response.status_code}")
-            except Exception as e:
-                print(f"[LLM] Erro ao chamar OpenRouter: {e}")
-        
-        # 2. Tenta NVIDIA NIM
+        # 1. NVIDIA (Primary)
         if self.nvidia_key:
             try:
                 headers = {
@@ -76,7 +50,7 @@ class SniperBrain:
             except Exception as e:
                 print(f"[LLM] Erro ao chamar NVIDIA: {e}")
         
-        # 3. Tenta DeepSeek (último recurso)
+        # 2. DeepSeek (Fallback)
         if self.deepseek_key:
             try:
                 headers = {
@@ -99,7 +73,7 @@ class SniperBrain:
             except Exception as e:
                 print(f"[LLM] Erro ao chamar DeepSeek: {e}")
         
-        raise Exception("Todos os provedores LLM falharam (OpenRouter, NVIDIA, DeepSeek)")
+        raise Exception("Todos os provedores LLM falharam (NVIDIA, DeepSeek)")
 
     def generate_script(self, theme, brand="Geral", trends_context="", channel_context="", target_duration=45):
         """Gera o roteiro, titulo, prompts visuais e clima musical unificados para a Dezafira em JSON
