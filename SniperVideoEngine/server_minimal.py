@@ -88,6 +88,34 @@ async def query_llm(messages: List[Dict[str, str]]) -> str:
     
     nvidia_key = os.getenv("NVIDIA_API_KEY", "")
     deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
+    hermes_url = os.getenv("HERMES_API_URL", "")
+    hermes_key = os.getenv("HERMES_API_KEY", "")
+    
+    # 0. Nous Hermes Agent (se disponível — memória + tools + skills)
+    if hermes_url and hermes_key:
+        try:
+            log_llm("hermes-agent", "Tentando Nous Hermes Agent...")
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{hermes_url}/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {hermes_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "messages": messages,
+                        "model": "nvidia",
+                    }
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    tokens = data.get("usage", {}).get("total_tokens", 0)
+                    log_llm("hermes-agent", "Nous Hermes respondeu!", tokens)
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    log_llm("hermes-agent", f"Hermes falhou: {response.status_code}")
+        except Exception as e:
+            log_llm("hermes-agent", f"Erro Hermes: {str(e)[:50]}")
     
     # 1. NVIDIA (Primary)
     if nvidia_key:

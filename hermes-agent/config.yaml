@@ -1,0 +1,50 @@
+# ============================================================================
+# Nous Hermes Agent — Configuração Dezafira
+# ============================================================================
+
+# ─── LLM Provider ─────────────────────────────────────────────────────────
+model:
+  provider: "nvidia"
+  # NVIDIA_API_KEY via env var
+
+# ─── Terminal (Shell Tools) ───────────────────────────────────────────────
+terminal:
+  backend: "local"
+  cwd: "/workspace"
+  timeout: 180
+  lifetime_seconds: 600
+
+# ─── Memória ──────────────────────────────────────────────────────────────
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
+  nudge_interval: 10
+  flush_min_turns: 6
+
+# ─── Tools ────────────────────────────────────────────────────────────────
+tools:
+  enabled:
+    - terminal
+    - file
+    - web
+    - skills
+    - cronjob
+
+# ─── API Server ───────────────────────────────────────────────────────────
+api:
+  host: "0.0.0.0"
+  port: 9119
+
+# ─── Cron (Agendamento) ──────────────────────────────────────────────────
+cron:
+  enabled: true
+  jobs:
+    - name: "produzir_videos_diarios"
+      schedule: "0 9 * * *"
+      message: "Pesquise as 3 tendências de hoje no YouTube e produza um vídeo vertical de cada. Use os scripts em /workspace/tools/"
+
+    - name: "analise_semanal"
+      schedule: "0 18 * * 0"
+      message: "Analise a performance dos vídeos produzidos esta semana. Consulte o banco de dados em /app/outputs/ e sugira melhorias."

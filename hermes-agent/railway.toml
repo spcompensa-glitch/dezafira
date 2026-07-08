@@ -1,0 +1,14 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "hermes-agent/Dockerfile"
+
+[deploy]
+startCommand = "/opt/hermes/.venv/bin/python -m hermes_cli gateway run"
+healthcheckPath = "/v1/models"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[volumes]]
+mountPath = "/opt/data"
+name = "hermes-state"
