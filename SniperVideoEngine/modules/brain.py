@@ -8,9 +8,11 @@ load_dotenv()
 
 class SniperBrain:
     def __init__(self):
+        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
         self.nvidia_key = os.getenv("NVIDIA_API_KEY")
+        self.deepseek_key = os.getenv("DEEPSEEK_API_KEY")
         self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "brand_config")
-        self.last_provider_used = "nvidia"
+        self.last_provider_used = "none"
 
     def _read_config_file(self, filename):
         file_path = os.path.join(self.config_dir, filename)
@@ -20,60 +22,84 @@ class SniperBrain:
         return f"[Arquivo {filename} não configurado. Por favor, adicione as diretrizes.]"
 
     def _call_llm(self, system_prompt, user_prompt, temperature=0.7):
-        """Chama o LLM via Nvidia NIM (Llama 3.3 70B)."""
-        if not self.nvidia_key:
-            raise ValueError("NVIDIA_API_KEY não configurada no .env.")
-
-        try:
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.nvidia_key}"
-            }
-            payload = {
-                "model": "meta/llama-3.1-70b-instruct",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "temperature": temperature,
-                "max_tokens": 1500
-            }
-            response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=60.0)
-            if response.status_code == 200:
-                self.last_provider_used = "nvidia"
-                return response.json()["choices"][0]["message"]["content"]
-            else:
-                raise Exception(f"Nvidia NIM retornou status {response.status_code}: {response.text[:200]}")
-        except Exception as e:
-            print(f"[LLM] Erro ao chamar Nvidia NIM: {e}. Tentando fallback com DeepSeek...")
-            deepseek_key = os.getenv("DEEPSEEK_API_KEY")
-            if deepseek_key:
-                try:
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {deepseek_key}"
-                    }
-                    payload = {
-                        "model": "deepseek-chat",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "temperature": temperature,
-                        "max_tokens": 1500
-                    }
-                    response = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60.0)
-                    if response.status_code == 200:
-                        self.last_provider_used = "deepseek"
-                        print("[LLM] Fallback com DeepSeek concluído com sucesso!")
-                        return response.json()["choices"][0]["message"]["content"]
-                    else:
-                        raise Exception(f"DeepSeek retornou status {response.status_code}: {response.text[:200]}")
-                except Exception as ds_err:
-                    print(f"[LLM] Falha no fallback com DeepSeek: {ds_err}")
-                    raise Exception(f"Ambos Nvidia NIM e DeepSeek falharam. Erro original: {e}, Erro DeepSeek: {ds_err}")
-            else:
-                raise e
+        """Chama o LLM com fallback: OpenRouter → NVIDIA → DeepSeek."""
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # 1. Tenta OpenRouter (mais barato e rápido)
+        if self.openrouter_key:
+            try:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.openrouter_key}",
+                    "HTTP-Referer": "https://dezafira.app",
+                    "X-Title": "Dezafira"
+                }
+                payload = {
+                    "model": "meta-llama/llama-3.3-70b-instruct:free",
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": 1500
+                }
+                response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60.0)
+                if response.status_code == 200:
+                    self.last_provider_used = "openrouter"
+                    print("[LLM] OpenRouter respondeu com sucesso!")
+                    return response.json()["choices"][0]["message"]["content"]
+                else:
+                    print(f"[LLM] OpenRouter retornou status {response.status_code}")
+            except Exception as e:
+                print(f"[LLM] Erro ao chamar OpenRouter: {e}")
+        
+        # 2. Tenta NVIDIA NIM
+        if self.nvidia_key:
+            try:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.nvidia_key}"
+                }
+                payload = {
+                    "model": "meta/llama-3.1-70b-instruct",
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": 1500
+                }
+                response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=60.0)
+                if response.status_code == 200:
+                    self.last_provider_used = "nvidia"
+                    print("[LLM] NVIDIA respondeu com sucesso!")
+                    return response.json()["choices"][0]["message"]["content"]
+                else:
+                    print(f"[LLM] NVIDIA retornou status {response.status_code}")
+            except Exception as e:
+                print(f"[LLM] Erro ao chamar NVIDIA: {e}")
+        
+        # 3. Tenta DeepSeek (último recurso)
+        if self.deepseek_key:
+            try:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.deepseek_key}"
+                }
+                payload = {
+                    "model": "deepseek-chat",
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": 1500
+                }
+                response = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60.0)
+                if response.status_code == 200:
+                    self.last_provider_used = "deepseek"
+                    print("[LLM] DeepSeek respondeu com sucesso!")
+                    return response.json()["choices"][0]["message"]["content"]
+                else:
+                    print(f"[LLM] DeepSeek retornou status {response.status_code}")
+            except Exception as e:
+                print(f"[LLM] Erro ao chamar DeepSeek: {e}")
+        
+        raise Exception("Todos os provedores LLM falharam (OpenRouter, NVIDIA, DeepSeek)")
 
     def generate_script(self, theme, brand="Geral", trends_context="", channel_context="", target_duration=45):
         """Gera o roteiro, titulo, prompts visuais e clima musical unificados para a Dezafira em JSON

@@ -47,29 +47,83 @@ hermes_chat_history = [
 
 async def query_llm(messages: List[Dict[str, str]]) -> str:
     import httpx
+    
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     nvidia_key = os.getenv("NVIDIA_API_KEY", "")
-    if not nvidia_key:
-        return "Chave NVIDIA_API_KEY não configurada."
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "https://integrate.api.nvidia.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {nvidia_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "meta/llama-3.3-70b-instruct",
-                    "messages": messages,
-                    "temperature": 0.7,
-                    "max_tokens": 1024
-                }
-            )
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        print(f"[LLM] Erro: {str(e)}")
-    return "Erro ao chamar o LLM."
+    deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
+    
+    # 1. OpenRouter
+    if openrouter_key:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {openrouter_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://dezafira.app",
+                        "X-Title": "Dezafira"
+                    },
+                    json={
+                        "model": "meta-llama/llama-3.3-70b-instruct:free",
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 1024
+                    }
+                )
+                if response.status_code == 200:
+                    print("[LLM] OpenRouter respondeu!")
+                    return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            print(f"[LLM] OpenRouter erro: {e}")
+    
+    # 2. NVIDIA
+    if nvidia_key:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "https://integrate.api.nvidia.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {nvidia_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "meta/llama-3.3-70b-instruct",
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 1024
+                    }
+                )
+                if response.status_code == 200:
+                    print("[LLM] NVIDIA respondeu!")
+                    return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            print(f"[LLM] NVIDIA erro: {e}")
+    
+    # 3. DeepSeek
+    if deepseek_key:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "https://api.deepseek.com/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {deepseek_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 1024
+                    }
+                )
+                if response.status_code == 200:
+                    print("[LLM] DeepSeek respondeu!")
+                    return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            print(f"[LLM] DeepSeek erro: {e}")
+    
+    return "Erro: Todos os provedores LLM falharam."
 
 @app.post("/api/v1/hermes/chat")
 async def hermes_chat(payload: dict, background_tasks: BackgroundTasks):
