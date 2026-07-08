@@ -20,6 +20,10 @@ const TABS = [
 
 const STORAGE_KEY = 'muapi_key';
 
+const API_BASE_URL = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:8000' : 'https://backend-production-fc8b.up.railway.app'))
+  : 'https://backend-production-fc8b.up.railway.app';
+
 export default function StandaloneShell() {
   const params = useParams();
   const router = useRouter();
@@ -59,6 +63,7 @@ export default function StandaloneShell() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [balance, setBalance] = useState(null);
+  const [llmStatus, setLlmStatus] = useState('loading'); // 'loading', 'nvidia', 'deepseek', 'error'
   const [showSettings, setShowSettings] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
@@ -128,16 +133,36 @@ export default function StandaloneShell() {
     }
   }, []);
 
+  const fetchLLMStatus = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/llm/logs`);
+      if (res.data.active_provider) {
+        setLlmStatus(res.data.active_provider);
+      }
+    } catch (err) {
+      // Try health check as fallback
+      try {
+        await axios.get(`${API_BASE_URL}/health`);
+        setLlmStatus('nvidia'); // Assume working if server is up
+      } catch {
+        setLlmStatus('error');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     setHasMounted(true);
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       setApiKey(stored);
       fetchBalance(stored);
-      // Sync cookie immediately on mount to establish identity for background requests
       document.cookie = `muapi_key=${stored}; path=/; max-age=31536000; SameSite=Lax`;
     }
-  }, [fetchBalance]);
+    // Fetch LLM status immediately and every 10 seconds
+    fetchLLMStatus();
+    const llmInterval = setInterval(fetchLLMStatus, 10000);
+    return () => clearInterval(llmInterval);
+  }, [fetchBalance, fetchLLMStatus]);
 
   const handleKeySave = useCallback((key) => {
     localStorage.setItem(STORAGE_KEY, key);
@@ -177,13 +202,6 @@ export default function StandaloneShell() {
       axios.interceptors.request.eject(interceptorId);
     };
   }, [apiKey]);
-
-  // Poll for balance every 30 seconds if key is present
-  useEffect(() => {
-    if (!apiKey) return;
-    const interval = setInterval(() => fetchBalance(apiKey), 30000);
-    return () => clearInterval(interval);
-  }, [apiKey, fetchBalance]);
 
   // Drag and Drop Handlers
   const handleDragOver = useCallback((e) => {
@@ -289,8 +307,15 @@ export default function StandaloneShell() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="bg-white/5 px-2.5 py-1 rounded-full border border-white/5 text-[11px] font-bold text-white/90">
-              ${balance !== null ? balance : '---'}
+            <div className="flex items-center gap-1.5 bg-white/5 px-2.5 py-1 rounded-full border border-white/5 text-[11px] font-bold">
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                llmStatus === 'error' ? 'bg-red-500 animate-pulse' : 
+                llmStatus === 'loading' ? 'bg-yellow-500 animate-pulse' : 
+                'bg-green-500 animate-pulse'
+              }`} />
+              <span className={llmStatus === 'error' ? 'text-red-400' : 'text-white/90'}>
+                {llmStatus === 'error' ? 'ERRO' : llmStatus.toUpperCase()}
+              </span>
             </div>
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -357,14 +382,28 @@ export default function StandaloneShell() {
 
             {/* Footer */}
             <div className="p-4 border-t border-white/[0.03] bg-black/10 flex flex-col gap-2.5">
-              {/* Saldo */}
+              {/* LLM Status */}
               <div className="flex items-center justify-between bg-white/5 px-4 py-2.5 rounded-xl border border-white/5">
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Saldo</span>
+                  {llmStatus === 'loading' ? (
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                  ) : llmStatus === 'error' ? (
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  ) : (
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  )}
+                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">LLM</span>
                 </div>
-                <span className="text-xs font-black text-white/90">
-                  ${balance !== null ? `${balance}` : '---'}
+                <span className={`text-[10px] font-bold ${
+                  llmStatus === 'error' ? 'text-red-400' : 
+                  llmStatus === 'loading' ? 'text-yellow-400' : 
+                  'text-green-400'
+                }`}>
+                  {llmStatus === 'loading' ? 'Verificando...' :
+                   llmStatus === 'error' ? 'Com Erro' :
+                   llmStatus === 'nvidia' ? 'NVIDIA' :
+                   llmStatus === 'deepseek' ? 'DeepSeek' :
+                   llmStatus}
                 </span>
               </div>
 

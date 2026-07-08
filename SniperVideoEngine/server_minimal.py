@@ -65,7 +65,7 @@ async def root():
 hermes_chat_history = [
     {
         "role": "assistant",
-        "content": "Olá! Sou o Hermes, o cérebro orquestrador do Dezafira. Como posso ajudar?"
+        "content": "Olá! Sou o Hermes, o orquestrador da DEZAFIRA. Controlo a fábrica de vídeos, canais YouTube e miniapps. O que deseja produzir?"
     }
 ]
 
@@ -159,7 +159,7 @@ async def get_hermes_history():
 @app.post("/api/v1/hermes/clear")
 async def clear_hermes_history():
     global hermes_chat_history
-    hermes_chat_history = [{"role": "assistant", "content": "Olá! Sou o Hermes. Como posso ajudar?"}]
+    hermes_chat_history = [{"role": "assistant", "content": "Olá! Sou o Hermes, o orquestrador da DEZAFIRA. Controlo a fábrica de vídeos, canais YouTube e miniapps. O que deseja produzir?"}]
     return {"message": "Histórico limpo"}
 
 async def process_hermes_command(message: str, channel_id: str = None, background_tasks: BackgroundTasks = None) -> tuple:
@@ -242,10 +242,24 @@ async def process_hermes_command(message: str, channel_id: str = None, backgroun
         )
     
     # FALLBACK - LLM
-    system_prompt = (
-        "Você é o Hermes, o cérebro orquestrador da plataforma DEZAFIRA.\n"
-        "Responda de forma direta e executiva."
-    )
+    system_prompt = """Você é o Hermes, o cérebro orquestrador da plataforma DEZAFIRA - uma fábrica automatizada de canais YouTube.
+
+Suas capacidades REAIS no sistema:
+1. PRODUÇÃO DE VÍDEOS: Gerar vídeos completos via Hyperframes (roteiro + narração + edição automática)
+2. GESTÃO DE CANAIS: Criar e gerenciar canais YouTube automatizados
+3. PESQUISA DE NICHO: Analisar tendências e oportunidades de mercado
+4. SEO & THUMBNAILS: Otimizar títulos, descrições e miniaturas para engajamento
+5. UPLOAD AUTOMÁTICO: Postar vídeos diretamente no YouTube via Playwright
+6. FÁBRICA DE MINIAPPS: Criar PWAs interativos (quizzes, landing pages) para monetização
+
+COMANDOS DISPONÍVEIS:
+• "produzir video [tema]" - Gera um vídeo vertical
+• "dois vídeos sobre [tema]" - Gera vertical + horizontal
+• "pesquisar [tema]" - Pesquisa o nicho
+• "criar canal [nicho]" - Cria documentação do canal
+
+Responda de forma DIRETA e EXECUTIVA. Foque no que o sistema DEZAFIRA pode fazer de REAL, não em conceitos genéricos de IA."""
+    
     response = await query_llm([{"role": "system", "content": system_prompt}, {"role": "user", "content": message}])
     return (response, None, None)
 
