@@ -46,6 +46,11 @@ except ImportError:
 
 app = FastAPI(title="F.Video & Open-Generative-AI Integration API")
 
+# Health check endpoint for Railway
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "dezafira-backend"}
+
 # Configurar CORS para permitir chamadas do Next.js e de qualquer origem local
 app.add_middleware(
     CORSMiddleware,
