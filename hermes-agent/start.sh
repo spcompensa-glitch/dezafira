@@ -18,7 +18,7 @@ mkdir -p /workspace/outputs
 mkdir -p /opt/data/skills
 
 # Copiar config para HERMES_HOME (/opt/data)
-cp -n /workspace/config.yaml /opt/data/config.yaml 2>/dev/null || true
+cp /workspace/config.yaml /opt/data/config.yaml 2>/dev/null || true
 
 echo "[Dezafira] Iniciando gateway (API server)..."
 echo "[Dezafira] Porta: 9119"
