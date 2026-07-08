@@ -61,6 +61,7 @@ RUN chmod +x /workspace/start.sh
 # Environment
 ENV HERMES_HOME=/opt/data
 ENV HERMES_DISABLE_LAZY_INSTALLS=1
+ENV HERMES_ALLOW_ROOT_GATEWAY=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/opt/hermes/.venv/bin:/opt/hermes/bin:${PATH}"
