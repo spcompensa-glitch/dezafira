@@ -206,33 +206,13 @@ _kokoro_pipeline = None
 _kokoro_available = None
 
 def _test_kokoro():
-    """Testa se Kokoro está disponível (com timeout)."""
+    """Kokoro desabilitado - trava na inicializacao. Usar Edge-TTS."""
     global _kokoro_available
     if _kokoro_available is not None:
         return _kokoro_available
-    
-    import threading
-    result = {'ok': False}
-    
-    def _test():
-        try:
-            from kokoro import KPipeline
-            pipeline = KPipeline(lang_code="p")
-            result['ok'] = True
-        except:
-            result['ok'] = False
-    
-    t = threading.Thread(target=_test, daemon=True)
-    t.start()
-    t.join(timeout=20)  # 20 segundos timeout
-    
-    _kokoro_available = result['ok']
-    if not _kokoro_available:
-        print("[Voice] Kokoro NAO disponivel (timeout 20s). Usando fallback.")
-    else:
-        print("[Voice] Kokoro disponivel!")
-    
-    return _kokoro_available
+    _kokoro_available = False
+    print("[Voice] Kokoro desabilitado (trava). Usando Edge-TTS.")
+    return False
 
 def _get_kokoro_pipeline():
     """Obtém ou cria o pipeline Kokoro (com cache)."""
@@ -286,7 +266,7 @@ async def generate_voice(
     padding_ms: int = 200,
 ) -> str:
     """
-    Gera áudio com fallback automático: Kokoro → Edge-TTS → gTTS.
+    Gera áudio com fallback automático: Edge-TTS → gTTS.
 
     Args:
         text: Texto para narração
@@ -304,84 +284,13 @@ async def generate_voice(
         Caminho do arquivo gerado
     """
 
-    # 1. Tentar Kokoro (melhor qualidade)
-    if _test_kokoro():
-        try:
-            def _generate_kokoro():
-                try:
-                    from kokoro import KPipeline
-                    import soundfile as sf
-                    import numpy as np
+    # Pré-processar texto
+    processed_text = TextPreprocessor.preprocess(text, emphasis_words)
+    print(f"[Voice] Texto processado: {len(processed_text)} chars")
 
-                    # Resolver voz
-                    if voice == "pf_dora" or voice not in ["pf_dora", "pm_alex", "af_heart", "am_adam"]:
-                        voice = VOICE_MAP.get(language, VOICE_MAP["pt"]).get(gender, "pf_dora")
-
-                    # Aplicar preset
-                    if preset and preset in VOICE_PRESETS:
-                        p = VOICE_PRESETS[preset]
-                        speed = p["speed"]
-                        print(f"[Voice] Preset: {preset} (speed={speed})")
-
-                    # Pré-processar texto
-                    processed_text = TextPreprocessor.preprocess(text, emphasis_words)
-                    print(f"[Voice] Texto processado: {len(processed_text)} chars")
-
-                    pipeline = _get_kokoro_pipeline()
-                    generator = pipeline(processed_text, voice=voice, speed=speed)
-
-                    # Converter para MP3 se necessário
-                    is_mp3 = output_path.lower().endswith(".mp3")
-                    wav_path = output_path if not is_mp3 else output_path + ".tmp.wav"
-
-                    # Concatenar chunks
-                    all_audio = []
-                    for i, (gs, ps, audio) in enumerate(generator):
-                        all_audio.append(audio)
-                        chunk_duration = len(audio) / 24000
-                        print(f"[Voice] Chunk {i+1}: {chunk_duration:.1f}s")
-
-                    if not all_audio:
-                        raise Exception("Kokoro não gerou nenhum áudio")
-
-                    combined = np.concatenate(all_audio)
-                    sf.write(wav_path, combined, 24000)
-
-                    total_duration = len(combined) / 24000
-                    print(f"[Voice] Total: {total_duration:.1f}s")
-
-                    # Converter para MP3
-                    if is_mp3:
-                        try:
-                            from pydub import AudioSegment
-                            audio_segment = AudioSegment.from_wav(wav_path)
-                            audio_segment.export(output_path, format="mp3", bitrate="192k")
-                            os.remove(wav_path)
-                        except Exception as e:
-                            print(f"[Voice] Erro MP3 ({e}). Mantendo WAV.")
-                            if os.path.exists(wav_path):
-                                os.rename(wav_path, output_path)
-
-                    # Pós-processamento
-                    if normalize:
-                        AudioPostProcessor.normalize_lufs(output_path)
-                    if padding_ms > 0:
-                        AudioPostProcessor.add_silence_padding(output_path, padding_ms)
-
-                    return output_path
-
-                except Exception as e:
-                    raise Exception(f"Erro no Kokoro TTS: {e}")
-
-            result = await asyncio.to_thread(_generate_kokoro)
-            if result:
-                return result
-        except Exception as e:
-            print(f"[Voice] Kokoro falhou: {e}. Tentando fallback...")
-
-    # 2. Tentar Edge-TTS (melhor que gTTS)
+    # 1. Edge-TTS (qualidade boa, funciona sempre)
     mp3_path = output_path if output_path.lower().endswith(".mp3") else output_path + ".mp3"
-    result = await generate_voice_edge(text, mp3_path, language)
+    result = await generate_voice_edge(processed_text, mp3_path, language)
     if result and os.path.exists(mp3_path):
         # Converter para WAV se necessário
         if not output_path.lower().endswith(".mp3"):
@@ -394,12 +303,13 @@ async def generate_voice(
                 pass
         if normalize:
             AudioPostProcessor.normalize_lufs(output_path)
+        print(f"[Voice] Edge-TTS OK: {output_path}")
         return output_path
 
-    # 3. Fallback final: gTTS
+    # 2. Fallback final: gTTS
     print("[Voice] Usando gTTS (fallback final)...")
     mp3_path = output_path if output_path.lower().endswith(".mp3") else output_path + ".mp3"
-    await generate_voice_gtts(text, mp3_path, language)
+    await generate_voice_gtts(processed_text, mp3_path, language)
     if os.path.exists(mp3_path):
         # Converter para WAV se necessário
         if not output_path.lower().endswith(".mp3"):
@@ -412,9 +322,10 @@ async def generate_voice(
                 pass
         if normalize:
             AudioPostProcessor.normalize_lufs(output_path)
+        print(f"[Voice] gTTS OK: {output_path}")
         return output_path
 
-    raise Exception("Todos os TTS falharam (Kokoro, Edge-TTS, gTTS)")
+    raise Exception("Todos os TTS falharam (Edge-TTS, gTTS)")
 
 
 # ─── Batch Generation ───────────────────────────────────────────────────────
