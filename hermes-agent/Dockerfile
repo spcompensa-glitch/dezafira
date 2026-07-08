@@ -43,7 +43,7 @@ WORKDIR /opt/hermes
 # Instalar dependências Python com uv
 RUN uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
 # Instalar aiohttp (necessário para API server gateway)
-RUN /opt/hermes/.venv/bin/pip install aiohttp
+RUN uv pip install aiohttp
 
 # ============================================================================
 # Stage 3: Runtime
