@@ -97,6 +97,73 @@ class ChannelKnowledge(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class DeliverableApp(Base):
+    __tablename__ = "deliverable_apps"
+
+    id = Column(String(50), primary_key=True, index=True)
+    channel_id = Column(String(50), nullable=False)
+    name = Column(String(100), nullable=False)
+    slug = Column(String(100), unique=True, index=True)
+    nicho = Column(String(100), nullable=False)
+    app_type = Column(String(50), default="quiz_diagnostico")
+    config_json = Column(JSON, nullable=False)
+    status = Column(String(20), default="active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AppPayment(Base):
+    __tablename__ = "app_payments"
+
+    id = Column(String(50), primary_key=True, index=True)
+    app_id = Column(String(50), nullable=False)
+    gateway = Column(String(50), nullable=False)
+    transaction_id = Column(String(100), unique=True, index=True)
+    status = Column(String(20), default="pending")
+    amount = Column(Integer, nullable=False)
+    customer_email = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class BlogChannel(Base):
+    __tablename__ = "blog_channels"
+
+    id = Column(String(50), primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    nicho = Column(String(100), default="Geral")
+    lang = Column(String(10), default="PT")
+    platform = Column(String(50), default="wordpress")
+    site_url = Column(String(500), nullable=True)
+    api_endpoint = Column(String(500), nullable=True)
+    api_token = Column(String(2000), nullable=True)
+    username = Column(String(100), nullable=True)
+    app_password = Column(String(500), nullable=True)
+    status = Column(String(20), default="active")
+    frequency = Column(String(20), default="daily")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class BlogPost(Base):
+    __tablename__ = "blog_posts"
+
+    id = Column(String(50), primary_key=True, index=True)
+    channel_id = Column(String(50), ForeignKey("blog_channels.id"), nullable=True)
+    title = Column(String(500), nullable=False)
+    slug = Column(String(500), nullable=True)
+    content = Column(Text, nullable=True)
+    excerpt = Column(String(1000), nullable=True)
+    keywords = Column(String(1000), nullable=True)
+    featured_image_url = Column(String(1000), nullable=True)
+    status = Column(String(30), default="draft")
+    platform_status = Column(String(30), nullable=True)
+    platform_post_id = Column(String(100), nullable=True)
+    platform_url = Column(String(1000), nullable=True)
+    word_count = Column(Integer, default=0)
+    topic = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    published_at = Column(DateTime, nullable=True)
+
+
 # Criar tabelas se não existirem com tratamento de erro
 try:
     Base.metadata.create_all(bind=engine)
@@ -359,3 +426,302 @@ def get_automation_task(task_id: int):
         return None
     finally:
         db.close()
+
+
+def create_db_deliverable_app(channel_id: str, name: str, slug: str, nicho: str, app_type: str, config_json: dict):
+    db = SessionLocal()
+    try:
+        new_app = DeliverableApp(
+            id=f"app_{uuid.uuid4().hex[:6]}",
+            channel_id=channel_id,
+            name=name,
+            slug=slug,
+            nicho=nicho,
+            app_type=app_type,
+            config_json=config_json,
+            status="active"
+        )
+        db.add(new_app)
+        db.commit()
+        return {
+            "id": new_app.id,
+            "channel_id": new_app.channel_id,
+            "name": new_app.name,
+            "slug": new_app.slug,
+            "nicho": new_app.nicho,
+            "app_type": new_app.app_type,
+            "config_json": new_app.config_json,
+            "status": new_app.status,
+            "created_at": new_app.created_at.isoformat() if new_app.created_at else None
+        }
+    finally:
+        db.close()
+
+def get_db_deliverable_app_by_slug(slug: str):
+    db = SessionLocal()
+    try:
+        app = db.query(DeliverableApp).filter(DeliverableApp.slug == slug).first()
+        if app:
+            return {
+                "id": app.id,
+                "channel_id": app.channel_id,
+                "name": app.name,
+                "slug": app.slug,
+                "nicho": app.nicho,
+                "app_type": app.app_type,
+                "config_json": app.config_json,
+                "status": app.status,
+                "created_at": app.created_at.isoformat() if app.created_at else None
+            }
+        return None
+    finally:
+        db.close()
+
+def get_db_deliverable_apps():
+    db = SessionLocal()
+    try:
+        apps = db.query(DeliverableApp).order_by(DeliverableApp.created_at.desc()).all()
+        return [
+            {
+                "id": app.id,
+                "channel_id": app.channel_id,
+                "name": app.name,
+                "slug": app.slug,
+                "nicho": app.nicho,
+                "app_type": app.app_type,
+                "config_json": app.config_json,
+                "status": app.status,
+                "created_at": app.created_at.isoformat() if app.created_at else None
+            } for app in apps
+        ]
+    finally:
+        db.close()
+
+def create_db_app_payment(app_id: str, gateway: str, transaction_id: str, amount: int, customer_email: str = None):
+    db = SessionLocal()
+    try:
+        payment = AppPayment(
+            id=f"pay_{uuid.uuid4().hex[:6]}",
+            app_id=app_id,
+            gateway=gateway,
+            transaction_id=transaction_id,
+            status="pending",
+            amount=amount,
+            customer_email=customer_email
+        )
+        db.add(payment)
+        db.commit()
+        return {
+            "id": payment.id,
+            "app_id": payment.app_id,
+            "gateway": payment.gateway,
+            "transaction_id": payment.transaction_id,
+            "status": payment.status,
+            "amount": payment.amount,
+            "customer_email": payment.customer_email
+        }
+    finally:
+        db.close()
+
+def update_db_app_payment(transaction_id: str, status: str):
+    db = SessionLocal()
+    try:
+        pay = db.query(AppPayment).filter(AppPayment.transaction_id == transaction_id).first()
+        if pay:
+            pay.status = status
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+
+# ─── Blog CRUD ─────────────────────────────────────────────────────────
+
+def create_db_blog_channel(name: str, nicho: str, lang: str, platform: str = "wordpress",
+                           site_url: str = "", api_endpoint: str = "", api_token: str = "") -> dict:
+    db = SessionLocal()
+    try:
+        new_chan = BlogChannel(
+            id=f"blg_{uuid.uuid4().hex[:6]}",
+            name=name,
+            nicho=nicho,
+            lang=lang,
+            platform=platform,
+            site_url=site_url,
+            api_endpoint=api_endpoint,
+            api_token=api_token,
+            status="active",
+        )
+        db.add(new_chan)
+        db.commit()
+        return {
+            "id": new_chan.id,
+            "name": new_chan.name,
+            "nicho": new_chan.nicho,
+            "lang": new_chan.lang,
+            "platform": new_chan.platform,
+            "site_url": new_chan.site_url,
+            "status": new_chan.status,
+        }
+    finally:
+        db.close()
+
+def get_db_blog_channels() -> list:
+    db = SessionLocal()
+    try:
+        channels = db.query(BlogChannel).order_by(BlogChannel.created_at.desc()).all()
+        return [
+            {
+                "id": c.id,
+                "name": c.name,
+                "nicho": c.nicho,
+                "lang": c.lang,
+                "platform": c.platform,
+                "site_url": c.site_url,
+                "status": c.status,
+                "frequency": c.frequency,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            } for c in channels
+        ]
+    finally:
+        db.close()
+
+def delete_db_blog_channel(channel_id: str) -> bool:
+    db = SessionLocal()
+    try:
+        db.query(BlogPost).filter(BlogPost.channel_id == channel_id).delete(synchronize_session=False)
+        chan = db.query(BlogChannel).filter(BlogChannel.id == channel_id).first()
+        if chan:
+            db.delete(chan)
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"[Database] Erro ao deletar blog channel: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+def create_db_blog_post(channel_id: str, title: str, slug: str, content: str,
+                        excerpt: str = "", keywords: str = "", topic: str = "") -> dict:
+    db = SessionLocal()
+    try:
+        new_post = BlogPost(
+            id=f"post_{uuid.uuid4().hex[:8]}",
+            channel_id=channel_id,
+            title=title,
+            slug=slug,
+            content=content,
+            excerpt=excerpt,
+            keywords=keywords,
+            topic=topic,
+            status="draft",
+            word_count=len(content.split()),
+        )
+        db.add(new_post)
+        db.commit()
+        return {
+            "id": new_post.id,
+            "title": new_post.title,
+            "slug": new_post.slug,
+            "status": new_post.status,
+            "word_count": new_post.word_count,
+            "created_at": new_post.created_at.isoformat() if new_post.created_at else None,
+        }
+    finally:
+        db.close()
+
+def get_db_blog_posts(channel_id: str = None, limit: int = 50) -> list:
+    db = SessionLocal()
+    try:
+        q = db.query(BlogPost).order_by(BlogPost.created_at.desc())
+        if channel_id:
+            q = q.filter(BlogPost.channel_id == channel_id)
+        posts = q.limit(limit).all()
+        return [
+            {
+                "id": p.id,
+                "channel_id": p.channel_id,
+                "title": p.title,
+                "slug": p.slug,
+                "excerpt": p.excerpt,
+                "keywords": p.keywords,
+                "status": p.status,
+                "platform_status": p.platform_status,
+                "platform_url": p.platform_url,
+                "word_count": p.word_count,
+                "topic": p.topic,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "published_at": p.published_at.isoformat() if p.published_at else None,
+            } for p in posts
+        ]
+    finally:
+        db.close()
+
+def get_db_blog_post(post_id: str) -> dict:
+    db = SessionLocal()
+    try:
+        p = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+        if p:
+            return {
+                "id": p.id,
+                "channel_id": p.channel_id,
+                "title": p.title,
+                "slug": p.slug,
+                "content": p.content,
+                "excerpt": p.excerpt,
+                "keywords": p.keywords,
+                "featured_image_url": p.featured_image_url,
+                "status": p.status,
+                "platform_status": p.platform_status,
+                "platform_post_id": p.platform_post_id,
+                "platform_url": p.platform_url,
+                "word_count": p.word_count,
+                "topic": p.topic,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "published_at": p.published_at.isoformat() if p.published_at else None,
+            }
+        return None
+    finally:
+        db.close()
+
+def update_db_blog_post(post_id: str, **kwargs) -> bool:
+    db = SessionLocal()
+    try:
+        post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+        if post:
+            for key, value in kwargs.items():
+                if hasattr(post, key):
+                    setattr(post, key, value)
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+def get_db_blog_channel(channel_id: str) -> dict:
+    db = SessionLocal()
+    try:
+        c = db.query(BlogChannel).filter(BlogChannel.id == channel_id).first()
+        if c:
+            return {
+                "id": c.id,
+                "name": c.name,
+                "nicho": c.nicho,
+                "lang": c.lang,
+                "platform": c.platform,
+                "site_url": c.site_url,
+                "api_endpoint": c.api_endpoint,
+                "api_token": c.api_token,
+                "username": c.username,
+                "app_password": c.app_password,
+                "status": c.status,
+                "frequency": c.frequency,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+        return None
+    finally:
+        db.close()
+

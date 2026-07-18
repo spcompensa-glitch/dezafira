@@ -1,39 +1,19 @@
-"""
-SEO Stage
-Estágio de otimização SEO do pipeline.
-"""
 from typing import Dict, Any
 
 
 class SEOStage:
-    """Estágio de otimização SEO."""
-
     async def execute(self, script: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Otimiza SEO do vídeo.
-        
-        Args:
-            script: Roteiro do vídeo
-            
-        Returns:
-            Dict com dados SEO otimizados
-        """
-        print(f"[SEOStage] Otimizando SEO...")
-        
         title = script.get("title", "")
-        
-        seo_data = {
+        from research.analyzers.seo_analyzer import SEOAnalyzer
+        seo_analyzer = SEOAnalyzer()
+        seo_result = await seo_analyzer.analyze([
+            {"title": title, "views": "1000", "channel": ""},
+        ])
+        tags = seo_result.get("keywords", []) if isinstance(seo_result, dict) else []
+        return {
             "optimized_title": title[:60],
-            "description": f"{script.get('hook', '')}\n\nNeste vídeo você vai descobrir tudo sobre {title}.",
-            "tags": [
-                title.split()[0].lower(),
-                "tutorial",
-                "dicas",
-                "2026",
-                "como fazer",
-            ],
-            "hashtags": ["#tutorial", "#dicas", "#2026"],
-            "category": "Science & Technology",
+            "description": script.get("hook", "") + f"\n\n{title}",
+            "tags": tags[:25] if isinstance(tags, list) else [],
+            "hashtags": [f"#{t}" for t in tags[:5]],
+            "seo_analysis": seo_result,
         }
-        
-        return seo_data

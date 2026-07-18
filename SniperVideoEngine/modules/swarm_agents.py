@@ -1,9 +1,8 @@
 import asyncio
 import os
-from .database import update_automation_task, get_automation_task
+from .database import update_automation_task
 from manager import SniperDirector
 from services.memory_service import (
-    get_channel_context_prompt,
     log_failed_keyword,
     log_success_pattern,
     seed_default_knowledge,
@@ -46,28 +45,18 @@ async def agent_triage(task_id: int, theme: str, channel_id: str, video_format: 
 
 async def agent_writer(task_id: int, best_title: str, theme: str, trends: list, channel_id: str = "default", video_format: str = "vertical"):
     """
-    Agente Roteirista: Escreve o roteiro e gera visual prompts usando o SniperBrain.
+    Agente Roteirista: Escreve o roteiro e gera visual prompts usando o ScriptWriter (DeepSeek 6-pass).
     Inclui contexto do Shared Memory (channel_knowledge) para personalizar o tom.
     """
     print(f"[Swarm - Writer] Escrevendo roteiro para a task {task_id} ({best_title})")
 
-    trends_context = "\n".join(
-        [f"- {t['title']} ({t['metric']})" for t in trends[:5]]
-    ) if trends else ""
-
-    # ─── Shared Memory: Injetar contexto do canal ────────────────────
-    channel_context = ""
-    if channel_id:
-        channel_context = get_channel_context_prompt(channel_id)
-        if channel_context:
-            print(f"[Swarm - Writer] Shared Memory encontrado para canal {channel_id}")
-
-    # Passar contexto da memória para o Brain
-    plan = director.brain.generate_script(
-        theme,
-        "Dezafira",
-        trends_context=trends_context,
-        channel_context=channel_context,
+    from modules.scriptwriter import ScriptWriter
+    writer = ScriptWriter(channel_id=channel_id)
+    plan = await writer.write(
+        theme=best_title,
+        target_seconds=60,
+        video_format=video_format,
+        language="pt",
     )
 
     script_text = plan.get('script', '')
@@ -113,7 +102,7 @@ async def agent_seo(task_id: int, best_title: str, plan: dict, channel_id: str =
 
 async def agent_producer(task_id: int, plan: dict, best_title: str, channel_id: str = "default", video_format: str = "vertical"):
     """
-    Agente Produtor: Gera áudio via Kokoro TTS e produz o vídeo
+    Agente Produtor: Gera áudio via Edge-TTS e produz o vídeo
     usando o OpenMontage como motor principal (com fallback MoviePy).
 
     Args:
@@ -136,7 +125,7 @@ async def agent_producer(task_id: int, plan: dict, best_title: str, channel_id: 
 
     voice_file = os.path.join(director.outputs_dir, f"{project_id}_voice.mp3")
 
-    print(f"[Swarm - Producer] Gerando TTS via Kokoro...")
+    print(f"[Swarm - Producer] Gerando TTS via Edge-TTS...")
     try:
         await generate_voice(plan.get("script", best_title), voice_file)
     except Exception as e:

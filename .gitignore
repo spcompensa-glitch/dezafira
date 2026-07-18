@@ -63,3 +63,15 @@ frontend_output.txt
 =0.3.0
 server.py
 SniperVideoEngineservices__init__.py
+
+# Binários pesados e Mídias geradas
+*.mp4
+*.mp3
+*.wav
+*.zip
+*.exe
+*.msi
+SniperVideoEngine/obscura_bin/
+SniperVideoEngine/hyperframes_work/
+open-generative-ai/hyperframes_composer/assets/
+SniperVideoEngine/credentials/

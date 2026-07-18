@@ -1,0 +1,115 @@
+{
+  "canal": "Com Jesus na Lua",
+  "characters": [
+    {
+      "id": "jesus",
+      "name": "Jesus",
+      "role": "narrador_guia",
+      "age": "eterno",
+      "appearance": {
+        "gender": "masculino",
+        "ethnicity": "middle_eastern_semitic",
+        "skin_tone": "bronzeado_oliva",
+        "hair": "castanho_escuro, ondulado, ombro",
+        "beard": "barba curta, bem aparada",
+        "eyes": "castanho escuro, profundas, acolhedoras",
+        "build": "atlético, nem magro nem gordo",
+        "clothing": "túnica branca com manto bege/dourado, sandálias de couro",
+        "accessories": "nenhum (simplicidade)"
+      },
+      "personality": ["sábio", "paciente", "carinhoso", "humor sutil", "autoridade gentil"],
+      "voice_profile": {
+        "voicebox_profile": "Adan-Test01",
+        "kokoro_voice": "pm_alex",
+        "speed": 0.85,
+        "pitch": 0,
+        "emotion": "calmo_profundo"
+      },
+      "prompts": {
+        "base": "Middle Eastern man, 30s, olive skin, dark brown wavy shoulder-length hair, short neatly trimmed beard, deep brown compassionate eyes, athletic build, wearing white linen tunic with beige/gold mantle, leather sandals, serene wise expression, cinematic lighting, photorealistic, 8K",
+        "moon_sitting": "Middle Eastern man sitting on lunar surface, Earth visible in background, starry sky, wearing white tunic with beige mantle, serene expression, soft golden light, cinematic composition, photorealistic, 8K, masterpiece",
+        "teaching": "Middle Eastern man gesturing gently while speaking, warm compassionate expression, soft golden light, cinematic portrait, photorealistic, 8K",
+        "reaction_gentle_smile": "Middle Eastern man with gentle wise smile, eyes full of warmth, soft golden lighting, cinematic close-up portrait, photorealistic, 8K"
+      },
+      "seed": 42,
+      "negative_prompt": "cartoon, anime, deformed, ugly, blurry, low quality, western features, blonde hair, blue eyes"
+    },
+    {
+      "id": "pedrinho",
+      "name": "Pedrinho",
+      "role": "curioso_perguntador",
+      "age": 12,
+      "appearance": {
+        "gender": "masculino",
+        "ethnicity": "brazilian_mixed",
+        "skin_tone": "moreno claro",
+        "hair": "castanho escuro, curto, levemente bagunçado",
+        "eyes": "castanho, grandes, curiosos",
+        "build": "magro, atlético, típico de pré-adolescente",
+        "clothing": "camiseta azul marinho, calça jeans, tênis branco",
+        "accessories": "nenhum"
+      },
+      "personality": ["curioso", "direto", "sem filtro", "corajoso", "empolgado"],
+      "voice_profile": {
+        "voicebox_profile": "Adan-Test01",
+        "kokoro_voice": "pm_alex",
+        "speed": 1.1,
+        "pitch": 3,
+        "emotion": "empolgado_jovem"
+      },
+      "prompts": {
+        "base": "Brazilian boy age 12, brown skin, short messy dark brown hair, big curious brown eyes, slim athletic build, wearing navy blue t-shirt, blue jeans, white sneakers, natural expression, cinematic lighting, photorealistic, 8K",
+        "moon_sitting": "Brazilian boy age 12 sitting on lunar surface, Earth in background, starry sky, wearing blue t-shirt and jeans, curious expression looking at Earth, cinematic composition, photorealistic, 8K",
+        "asking_question": "Brazilian boy age 12 with curious excited expression, mouth slightly open as if asking question, looking up, cinematic lighting, photorealistic, 8K",
+        "reaction_amazed": "Brazilian boy age 12 with amazed wide-eyed expression, mouth open in awe, cinematic close-up portrait, photorealistic, 8K"
+      },
+      "seed": 43,
+      "negative_prompt": "cartoon, anime, deformed, ugly, blurry, low quality, adult, too young"
+    },
+    {
+      "id": "livia",
+      "name": "Lívia",
+      "role": "inocente_perguntadora",
+      "age": 4,
+      "appearance": {
+        "gender": "feminino",
+        "ethnicity": "brazilian_mixed",
+        "skin_tone": "morena clara",
+        "hair": "castanho escuro, comprido, com rabo de cavalo",
+        "eyes": "castanho, grandes, brilhantes, inocentes",
+        "build": "pequena, franzina, típica de criança de 4 anos",
+        "clothing": "vestido roxo com estampas de estrelas, sapatilhas brancas",
+        "accessories": "presilha de estrela no cabelo"
+      },
+      "personality": ["inocente", "curiosa", "faz_perguntas_simples", "doce", "surpreendente"],
+      "voice_profile": {
+        "voicebox_profile": "Dora PT-BR",
+        "kokoro_voice": "pf_dora",
+        "speed": 1.15,
+        "pitch": 5,
+        "emotion": "doce_inocente"
+      },
+      "prompts": {
+        "base": "Brazilian girl age 4, brown skin, long dark brown hair in ponytail with star clip, big bright brown innocent eyes, small petite build, wearing purple dress with star patterns, white shoes, sweet natural expression, cinematic lighting, photorealistic, 8K",
+        "moon_sitting": "Brazilian girl age 4 sitting on lunar surface, Earth in background, starry sky, wearing purple star dress, looking at Earth with wonder, cinematic composition, photorealistic, 8K",
+        "asking_question": "Brazilian girl age 4 with innocent curious expression, head tilted, looking up with wide eyes, cinematic lighting, photorealistic, 8K",
+        "reaction_wonder": "Brazilian girl age 4 with wonder and amazement, mouth small O shape, eyes wide, cinematic close-up portrait, photorealistic, 8K"
+      },
+      "seed": 44,
+      "negative_prompt": "cartoon, anime, deformed, ugly, blurry, low quality, adult, too mature"
+    },
+    {
+      "id": "cenario_lua",
+      "name": "Cenário Principal — Lua",
+      "role": "cenario",
+      "prompts": {
+        "wide_shot": "Lunar surface with realistic craters and dust, Earth visible in dark starry sky background, soft golden rim lighting from distant sun, cinematic wide angle composition, photorealistic, 8K, masterpiece, no people",
+        "with_characters": "Three people sitting on lunar surface — Middle Eastern man in white tunic, Brazilian boy in blue shirt, Brazilian girl in purple dress — Earth visible in starry sky, soft golden light, cinematic composition, photorealistic, 8K",
+        "close_surface": "Close-up of lunar surface texture with fine dust particles, small craters, realistic moon rocks, soft ambient lighting, photorealistic, 8K",
+        "earth_view": "Planet Earth seen from Moon surface, blue oceans, green continents, white clouds, thin atmosphere glow, dark space background with stars, cinematic composition, photorealistic, 8K"
+      },
+      "seed": 45,
+      "negative_prompt": "cartoon, anime, unrealistic, fantasy, bright colors, plastic, low quality"
+    }
+  ]
+}

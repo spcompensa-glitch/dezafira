@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Com Jesus na Lua - Roteiros & Prompts</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #0A1628 0%, #1a1a3e 100%);
+            padding: 24px 32px;
+            border-bottom: 1px solid rgba(212,168,67,0.2);
+        }
+        .header .tag {
+            font-size: 10px;
+            font-weight: 800;
+            color: #D4A843;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            background: linear-gradient(90deg, #D4A843, #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header p { color: rgba(255,255,255,0.5); font-size: 14px; margin-top: 4px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding-bottom: 12px;
+        }
+        .tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.2s;
+        }
+        .tab:hover { background: rgba(212,168,67,0.1); border-color: rgba(212,168,67,0.3); }
+        .tab.active { background: #D4A843; color: #0A1628; border-color: #D4A843; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .card {
+            background: #141414;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        .card h2 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #D4A843;
+        }
+        .card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+            color: rgba(255,255,255,0.8);
+        }
+        .dialogue-line {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border-left: 3px solid;
+        }
+        .dialogue-line.jesus { border-color: #D4A843; }
+        .dialogue-line.pedrinho { border-color: #3498db; }
+        .dialogue-line.livia { border-color: #9b59b6; }
+        .dialogue-line .speaker {
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            min-width: 80px;
+        }
+        .dialogue-line.jesus .speaker { color: #D4A843; }
+        .dialogue-line.pedrinho .speaker { color: #3498db; }
+        .dialogue-line.livia .speaker { color: #9b59b6; }
+        .dialogue-line .text {
+            font-size: 14px;
+            line-height: 1.5;
+            color: rgba(255,255,255,0.85);
+        }
+        .prompt-box {
+            background: #1a1a2e;
+            border: 1px solid rgba(52,152,219,0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: rgba(255,255,255,0.8);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .prompt-box .label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #3498db;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        .character-card {
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        .character-card .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+        .character-card.jesus .avatar { background: rgba(212,168,67,0.2); }
+        .character-card.pedrinho .avatar { background: rgba(52,152,219,0.2); }
+        .character-card.livia .avatar { background: rgba(155,89,182,0.2); }
+        .character-card h3 { font-size: 16px; margin-bottom: 4px; }
+        .character-card .role { font-size: 12px; color: rgba(255,255,255,0.5); }
+        .character-card .details { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 8px; text-align: left; }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #D4A843; color: #0A1628; }
+        .btn-primary:hover { background: #e6ba5a; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+        .btn-group { display: flex; gap: 8px; margin-top: 16px; }
+        .status-bar {
+            display: flex;
+            gap: 16px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 12px;
+        }
+        .status-item { display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.green { background: #1ed760; }
+        .status-dot.yellow { background: #f5a623; }
+        .status-dot.red { background: #e74c3c; }
+        textarea {
+            width: 100%;
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 16px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 120px;
+        }
+        textarea:focus { outline: none; border-color: #D4A843; }
+        input[type="text"] {
+            width: 100%;
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 14px;
+        }
+        input[type="text"]:focus { outline: none; border-color: #D4A843; }
+        label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); display: block; margin-bottom: 6px; }
+        .form-group { margin-bottom: 16px; }
+        .templates-list { display: flex; flex-direction: column; gap: 8px; }
+        .template-item {
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .template-item:hover { border-color: rgba(212,168,67,0.3); background: rgba(212,168,67,0.05); }
+        .template-item h4 { font-size: 14px; margin-bottom: 4px; }
+        .template-item p { font-size: 12px; color: rgba(255,255,255,0.5); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="tag">ROTEIROS & PROMPTS</div>
+        <h1>Com Jesus na Lua</h1>
+        <p>Gerencie roteiros, prompts de imagem e diálogos do canal</p>
+    </div>
+
+    <div class="container">
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot green"></div>
+                <span>VoiceBOX: <strong id="voicebox-status">Verificando...</strong></span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot green"></div>
+                <span>CapCut: <strong>Pronto</strong></span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot yellow"></div>
+                <span>Personagens: <strong>4 carregados</strong></span>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showPanel('dialogue')">Dialogo</div>
+            <div class="tab" onclick="showPanel('prompts')">Prompts de Imagem</div>
+            <div class="tab" onclick="showPanel('characters')">Personagens</div>
+            <div class="tab" onclick="showPanel('templates')">Templates</div>
+            <div class="tab" onclick="showPanel('new episode')">Novo Episodio</div>
+        </div>
+
+        <!-- PANEL: DIALOGO -->
+        <div id="panel-dialogue" class="panel active">
+            <div class="card">
+                <h2>Episodio 1 - Apresentacao do Canal</h2>
+                <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 16px;">~2 minutos | 11 falas | Cenario: Lua com Terra ao fundo</p>
+
+                <div class="dialogue-line livia">
+                    <div class="speaker">Livia</div>
+                    <div class="text">Jesus, onde a gente ta?!</div>
+                </div>
+                <div class="dialogue-line jesus">
+                    <div class="speaker">Jesus</div>
+                    <div class="text">Ta vendo aquela bolinha azul? E a Terra. De onde voce vieram.</div>
+                </div>
+                <div class="dialogue-line pedrinho">
+                    <div class="speaker">Pedrinho</div>
+                    <div class="text">E por que a gente ta na Lua, Jesus?</div>
+                </div>
+                <div class="dialogue-line jesus">
+                    <div class="speaker">Jesus</div>
+                    <div class="text">Porque aqui e o melhor lugar pra gente conversar. Sem barulho, sem distracao. So a gente, as estrelas, e a Terra la embaixo.</div>
+                </div>
+                <div class="dialogue-line jesus">
+                    <div class="speaker">Jesus</div>
+                    <div class="text">Voces vao me fazer perguntas, e eu vou responder. Pode ser sobre qualquer coisa - a Biblia, a historia, o mundo, o futuro.</div>
+                </div>
+                <div class="dialogue-line livia">
+                    <div class="speaker">Livia</div>
+                    <div class="text">Qualquer mesmo?</div>
+                </div>
+                <div class="dialogue-line jesus">
+                    <div class="speaker">Jesus</div>
+                    <div class="text">Qualquer.</div>
+                </div>
+                <div class="dialogue-line pedrinho">
+                    <div class="speaker">Pedrinho</div>
+                    <div class="text">Tipo... o que vai acontecer com o mundo?</div>
+                </div>
+                <div class="dialogue-line jesus">
+                    <div class="speaker">Jesus</div>
+                    <div class="text">(sorrindo) Essa e boa. Vamos falar disso no proximo video.</div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="generateAudio()">Gerar Audio (VoiceBOX)</button>
+                    <button class="btn btn-secondary" onclick="exportCapCut()">Exportar para CapCut</button>
+                    <button class="btn btn-secondary" onclick="copyDialogue()">Copiar Texto</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: PROMPTS -->
+        <div id="panel-prompts" class="panel">
+            <div class="card">
+                <h2>Prompts de Geração de Imagem</h2>
+                <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 16px;">FLUX.2 Klein 4B via OpenRouter | Seed fixa para consistencia</p>
+
+                <h3>Jesus - Lua</h3>
+                <div class="prompt-box">
+<span class="label">PROMPT</span>Middle Eastern man sitting on lunar surface, Earth visible in background, starry sky, wearing white tunic with beige mantle, serene expression, soft golden light, cinematic composition, photorealistic, 8K, masterpiece</div>
+
+                <h3>Pedrinho - Lua</h3>
+                <div class="prompt-box">
+<span class="label">PROMPT</span>Brazilian boy age 12 sitting on lunar surface, Earth in background, starry sky, wearing blue t-shirt and jeans, curious expression looking at Earth, cinematic composition, photorealistic, 8K</div>
+
+                <h3>Livia - Lua</h3>
+                <div class="prompt-box">
+<span class="label">PROMPT</span>Brazilian girl age 4 sitting on lunar surface, Earth in background, starry sky, wearing purple star dress, looking at Earth with wonder, cinematic composition, photorealistic, 8K</div>
+
+                <h3>Cenario - Lua Wide Shot</h3>
+                <div class="prompt-box">
+<span class="label">PROMPT</span>Lunar surface with realistic craters and dust, Earth visible in dark starry sky background, soft golden rim lighting from distant sun, cinematic wide angle composition, photorealistic, 8K, masterpiece, no people</div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="generateAllRefs()">Gerar Todas as Referencias</button>
+                    <button class="btn btn-secondary" onclick="copyPrompts()">Copiar Prompts</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: PERSONAGENS -->
+        <div id="panel-characters" class="panel">
+            <div class="character-grid">
+                <div class="character-card jesus">
+                    <div class="avatar">👤</div>
+                    <h3>Jesus</h3>
+                    <div class="role">Narrador / Guia</div>
+                    <div class="details">
+                        <strong>Voz:</strong> pm_alex (Kokoro) | Speed: 0.85<br>
+                        <strong>Seed:</strong> 42<br>
+                        <strong>Estilo:</strong> Calmo, profundo, sabio
+                    </div>
+                </div>
+                <div class="character-card pedrinho">
+                    <div class="avatar">👦</div>
+                    <h3>Pedrinho</h3>
+                    <div class="role">Curioso / Perguntador</div>
+                    <div class="details">
+                        <strong>Voz:</strong> pm_alex (Kokoro) | Speed: 1.1, Pitch: +3<br>
+                        <strong>Seed:</strong> 43<br>
+                        <strong>Estilo:</strong> Jovem, empolgado, direto
+                    </div>
+                </div>
+                <div class="character-card livia">
+                    <div class="avatar">👧</div>
+                    <h3>Livia</h3>
+                    <div class="role">Inocente / Perguntadora</div>
+                    <div class="details">
+                        <strong>Voz:</strong> pf_dora (Kokoro) | Speed: 1.15, Pitch: +5<br>
+                        <strong>Seed:</strong> 44<br>
+                        <strong>Estilo:</strong> Doce, inocente, surpreendente
+                    </div>
+                </div>
+                <div class="character-card" style="border-color: rgba(255,255,255,0.1);">
+                    <div class="avatar" style="background: rgba(255,255,255,0.05);">🌑</div>
+                    <h3>Cenario - Lua</h3>
+                    <div class="role">Cenario Principal</div>
+                    <div class="details">
+                        <strong>Seed:</strong> 45<br>
+                        <strong>Elementos:</strong> Superficie lunar, Terra ao fundo, ceu estrelado<br>
+                        <strong>Iluminacao:</strong> Dourada, cinematica
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: TEMPLATES -->
+        <div id="panel-templates" class="panel">
+            <div class="card">
+                <h2>Templates de Episodio</h2>
+                <div class="templates-list">
+                    <div class="template-item" onclick="loadTemplate('apresentacao')">
+                        <h4>Apresentacao do Canal (Ep. 1)</h4>
+                        <p>~2 min | Jesus apresenta o canal, faz promessa de conteudo. Gancho: pergunta surpreendente.</p>
+                    </div>
+                    <div class="template-item" onclick="loadTemplate('pergunta_simples')">
+                        <h4>Pergunta Simples -> Historia Profunda</h4>
+                        <p>~3-5 min | Crianca faz pergunta simples, Jesus responde com historia biblica. Insert visual.</p>
+                    </div>
+                    <div class="template-item" onclick="loadTemplate('profecia')">
+                        <h4>Profecia / Evento Historico</h4>
+                        <p>~4-5 min | Pedrinho pergunta sobre profecia/evento. Jesus explica com timeline visual.</p>
+                    </div>
+                    <div class="template-item" onclick="loadTemplate('comparacao')">
+                        <h4>Comparacao Historica</h4>
+                        <p>~3-4 min | Livia pergunta sobre o passado. Jesus compara passado vs presente.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: NOVO EPISODIO -->
+        <div id="panel-new episode" class="panel">
+            <div class="card">
+                <h2>Novo Episodio</h2>
+                <div class="form-group">
+                    <label>Titulo do Episodio</label>
+                    <input type="text" id="episode-title" placeholder="Ex: Por que a Terra e redonda?">
+                </div>
+                <div class="form-group">
+                    <label>Tema / Pergunta Principal</label>
+                    <textarea id="episode-topic" placeholder="Ex: Livia pergunta por que a Terra e redonda, e Jesus explica a criacao do mundo com uma historia visual..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Template</label>
+                    <select id="episode-template" style="width:100%; padding:12px; background:#1a1a2e; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#fff; font-size:14px;">
+                        <option value="pergunta_simples">Pergunta Simples -> Historia Profunda</option>
+                        <option value="profecia">Profecia / Evento Historico</option>
+                        <option value="comparacao">Comparacao Historica</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ref Biblica (opcional)</label>
+                    <input type="text" id="episode-reference" placeholder="Ex: Genesis 1:1-5">
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="generateEpisode()">Gerar Roteiro com IA</button>
+                    <button class="btn btn-secondary" onclick="previewEpisode()">Visualizar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPanel(name) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('panel-' + name).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function checkVoicebox() {
+            try {
+                const resp = await fetch('http://127.0.0.1:17493/api/profiles');
+                if (resp.ok) {
+                    document.getElementById('voicebox-status').textContent = 'Conectado';
+                    document.getElementById('voicebox-status').style.color = '#1ed760';
+                } else {
+                    document.getElementById('voicebox-status').textContent = 'Erro';
+                    document.getElementById('voicebox-status').style.color = '#e74c3c';
+                }
+            } catch(e) {
+                document.getElementById('voicebox-status').textContent = 'Offline';
+                document.getElementById('voicebox-status').style.color = '#f5a623';
+            }
+        }
+
+        function generateAudio() {
+            alert('Gerando audio via VoiceBOX...\n\nJesus: pm_alex (0.85x)\nPedrinho: pm_alex (1.1x, +3 pitch)\nLivia: pf_dora (1.15x, +5 pitch)');
+        }
+
+        function exportCapCut() {
+            alert('Exportando draft CapCut v8.7.0...\n\nArquivo: ep01_apresentacao.json');
+        }
+
+        function copyDialogue() {
+            const lines = document.querySelectorAll('#panel-dialogue .dialogue-line');
+            let text = '';
+            lines.forEach(line => {
+                const speaker = line.querySelector('.speaker').textContent;
+                const dialogue = line.querySelector('.text').textContent;
+                text += `${speaker}: ${dialogue}\n`;
+            });
+            navigator.clipboard.writeText(text);
+            alert('Dialogue copiado!');
+        }
+
+        function copyPrompts() {
+            const prompts = document.querySelectorAll('#panel-prompts .prompt-box');
+            let text = '';
+            prompts.forEach(p => text += p.textContent.trim() + '\n\n');
+            navigator.clipboard.writeText(text);
+            alert('Prompts copiados!');
+        }
+
+        function generateAllRefs() {
+            alert('Gerando character references...\n\nJesus (seed 42)\nPedrinho (seed 43)\nLivia (seed 44)\nCenario (seed 45)');
+        }
+
+        function loadTemplate(type) {
+            showPanel('new episode');
+            document.getElementById('episode-template').value = type;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab')[4].classList.add('active');
+        }
+
+        function generateEpisode() {
+            const title = document.getElementById('episode-title').value;
+            const topic = document.getElementById('episode-topic').value;
+            if (!title || !topic) {
+                alert('Preencha titulo e tema!');
+                return;
+            }
+            alert(`Gerando roteiro...\n\nTitulo: ${title}\nTema: ${topic}\n\nUsando DeepSeek 3-pass...`);
+        }
+
+        function previewEpisode() {
+            alert('Visualizacao do episodio...\n\nAbrir draft CapCut para preview.');
+        }
+
+        checkVoicebox();
+    </script>
+</body>
+</html>

@@ -1,27 +1,37 @@
 # Target Audience
 
-EDAD APROXIMADA: [Ex: 20–35 anos]
+IDADE: 18-60 anos (universal)
 
-QUÉ YA INTENTÓ:
-[O que ele tentou antes de encontrar seu canal. Seja específico, ex: "tentou drop shipping, perdeu dinheiro com anúncios e desistiu no primeiro mês"]
+O QUE JÁ TENTOU:
+- Assiste shorts de mistérios bíblicos no YouTube/Instagram
+- Já leu a Bíblia mas sentiu que faltava algo
+- Vê conteúdo cristão genérico e sente que é "muito raso"
+- Pesquisa coisas como "segredos da Bíblia", "profecias que se cumpriram", "o que a Bíblia não conta"
 
-POR QUÉ FALLÓ:
-[Por que essas soluções não funcionaram para ele]
+POR QUE FALHOU:
+- Conteúdo muito religioso/jurou pra ele (se sente excluído)
+- Conteúdo muito acadêmico (não entende ou fica entediado)
+- Conteúdo repetitivo (sempre as mesmas 5 curiosidades)
+- Falta de profundidade real — só superficialidades
 
-MIEDOS PRINCIPALES:
-1. [Medo específico #1]
-2. [Medo específico #2]
-3. [Medo específico #3]
+MEDOS:
+1. Perder tempo com conteúdo que não agrega nada
+2. Não conseguir entender a Bíblia de verdade
+3. Ser enganado por interpretações erradas
 
-DESEOS PRINCIPALES:
-1. [Desejo específico #1]
-2. [Desejo específico #2]
-3. [Desejo específico #3]
+DESEJOS:
+1. Descobrir verdades que poucos conhecem
+2. Sentir que está aprendendo algo genuinamente novo
+3. Ter "aha moments" — aquela sensação de "não sabia disso!"
 
-LENGUAJE QUE USA:
-[Frases, termos, gírias que seu público usa ao falar do tema]
+LÍNGUA QUE USA:
+- "Mistério", "segredo", "verdade oculta", "o que ninguém fala"
+- "Conexão", "se encaixa", "faz sentido agora"
+- "Incível", "não acredito", "como assim?"
 
-LO QUE LO HACE ABANDONAR EL VIDEO:
-- [Ex: Introduções lentas que não confirmam o clique]
-- [Ex: Informações repetidas que ele já conhece]
-- [Ex: Tom de voz condescendente ou chato]
+O QUE FAZ ELE ABANDONAR O VÍDEO:
+- Introdução lenta que não confirma o clique
+- Tom de sermão ou pregação
+- Informação repetida que ele já conhece
+- Explicações longas sem payoff visual
+- Promessa de mistério que não entrega

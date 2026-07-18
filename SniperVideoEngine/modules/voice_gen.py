@@ -1,15 +1,14 @@
 """
-Kokoro TTS Engine — Geração de Voz Qualidade Cinema (v2)
-========================================================
-Apache 2.0, CPU-friendly, multi-voz.
+Edge-TTS Engine — Geração de Voz (v3)
+======================================
+TTS primário: Edge-TTS (Microsoft, grátis).
+Fallback: gTTS (Google, grátis).
 
-v2.0 — Qualidade Cinema:
+v3.0:
 - Text preprocessing (limpeza, normalização, marcação de ênfase)
-- Voice presets por tipo de conteúdo (narration, hook, story)
-- Speed/pitch/energy control dinâmico
-- Pausas naturais por pontuação
-- Normalização LUFS pós-geração
-- Conversão MP3 192k bitrate
+- Edge-TTS como motor primário (vozes naturais pt-BR/en-US)
+- gTTS como fallback automático
+- Normalização LUFS pós-geração (YouTube standard -14)
 """
 
 import os
@@ -43,16 +42,10 @@ VOICE_PRESETS = {
     },
 }
 
-# Mapeamento de vozes Kokoro por idioma
+# Mapeamento de vozes Edge-TTS por idioma
 VOICE_MAP = {
-    "pt": {
-        "feminina": "pf_dora",
-        "masculina": "pm_alex",
-    },
-    "en": {
-        "feminina": "af_heart",
-        "masculina": "am_adam",
-    },
+    "pt": "pt-BR-AntonioNeural",
+    "en": "en-US-GuyNeural",
 }
 
 
@@ -201,29 +194,6 @@ class AudioPostProcessor:
 
 # ─── Main TTS Function ──────────────────────────────────────────────────────
 
-# Cache para Kokoro pipeline (evitar recarregar)
-_kokoro_pipeline = None
-_kokoro_available = None
-
-def _test_kokoro():
-    """Kokoro desabilitado - trava na inicializacao. Usar Edge-TTS."""
-    global _kokoro_available
-    if _kokoro_available is not None:
-        return _kokoro_available
-    _kokoro_available = False
-    print("[Voice] Kokoro desabilitado (trava). Usando Edge-TTS.")
-    return False
-
-def _get_kokoro_pipeline():
-    """Obtém ou cria o pipeline Kokoro (com cache)."""
-    global _kokoro_pipeline
-    if _kokoro_pipeline is not None:
-        return _kokoro_pipeline
-    
-    from kokoro import KPipeline
-    _kokoro_pipeline = KPipeline(lang_code="p")
-    return _kokoro_pipeline
-
 async def generate_voice_gtts(text, output_path, language="pt"):
     """Fallback: gTTS (qualidade básica, mas funciona sempre)."""
     from gtts import gTTS
@@ -233,21 +203,37 @@ async def generate_voice_gtts(text, output_path, language="pt"):
     print(f"[Voice] gTTS: {output_path}")
     return output_path
 
-async def generate_voice_edge(text, output_path, language="pt"):
-    """Fallback: Edge-TTS (melhor que gTTS, mas pode falhar com 403)."""
+async def generate_voice_edge(text, output_path, language="pt", voice=None):
+    """Motor primário: Edge-TTS (Microsoft, qualidade natural)."""
     try:
         import edge_tts
-        
-        # Mapear vozes
-        voice_map = {
-            "pt": "pt-BR-FranciscaNeural",
-            "en": "en-US-JennyNeural",
+        # Usar voz especificada ou fallback para VOICE_MAP
+        if not voice:
+            voice = VOICE_MAP.get(language, "pt-BR-AntonioNeural")
+        # Limpar TODOS os caracteres especiais que quebram Edge-TTS
+        clean = text
+        replacements = {
+            '→': ' para ', '←': ' de ', '⇒': ' para ', '⇐': ' de ',
+            '•': '-', '–': '-', '—': '-', '…': '...', '\u200b': '',
+            '°': ' graus', '®': '', '™': '', '©': '',
+            '↑': ' para cima', '↓': ' para baixo', '↔': ' entre ',
+            '≤': ' menor ou igual', '≥': ' maior ou igual', '≠': ' diferente de',
+            '±': ' mais ou menos', '×': ' vezes', '÷': ' dividido por',
+            '√': ' raiz', '∞': ' infinito', 'π': ' pi',
+            'é': 'e', 'ê': 'e', 'ã': 'a', 'õ': 'o', 'ç': 'c',
+            'á': 'a', 'à': 'a', 'â': 'a', 'ó': 'o', 'ô': 'o',
+            'ú': 'u', 'í': 'i', 'ê': 'e', 'ã': 'a', 'õ': 'o',
         }
-        voice = voice_map.get(language, "pt-BR-FranciscaNeural")
+        for old, new in replacements.items():
+            clean = clean.replace(old, new)
+        # Remover qualquer caractere não-ASCII restante
+        clean = ''.join(c if ord(c) < 128 else ' ' for c in clean)
+        # Limpar espaços múltiplos
+        clean = ' '.join(clean.split())
         
-        tts = edge_tts.Communicate(text, voice)
+        tts = edge_tts.Communicate(clean, voice)
         await tts.save(output_path)
-        print(f"[Voice] Edge-TTS: {output_path}")
+        print(f"[Voice] Edge-TTS voz: {voice} -> {output_path}")
         return output_path
     except Exception as e:
         print(f"[Voice] Edge-TTS falhou: {e}")
@@ -256,12 +242,12 @@ async def generate_voice_edge(text, output_path, language="pt"):
 async def generate_voice(
     text: str,
     output_path: str,
-    voice: str = "pf_dora",
+    voice: str = "pt-BR-AntonioNeural",
     speed: float = 1.0,
     preset: Optional[str] = None,
     emphasis_words: Optional[List[str]] = None,
     language: str = "pt",
-    gender: str = "feminina",
+    gender: str = "masculina",
     normalize: bool = True,
     padding_ms: int = 200,
 ) -> str:
@@ -271,8 +257,8 @@ async def generate_voice(
     Args:
         text: Texto para narração
         output_path: Caminho de saída (WAV ou MP3)
-        voice: Voz específica (override de gender)
-        speed: Velocidade (override de preset)
+        voice: Voz Edge-TTS (ex: pt-BR-FranciscaNeural)
+        speed: Velocidade (não usado pelo Edge-TTS, compatibilidade)
         preset: Voice preset (narration_punchy, etc.)
         emphasis_words: Palavras para ênfase
         language: Código idioma (pt, en)
@@ -286,13 +272,18 @@ async def generate_voice(
 
     # Pré-processar texto
     processed_text = TextPreprocessor.preprocess(text, emphasis_words)
+    # Limpar caracteres especiais que quebram Edge-TTS
+    processed_text = processed_text.replace('→', 'para').replace('←', 'de')
+    processed_text = processed_text.replace('⇒', 'para').replace('⇐', 'de')
+    processed_text = processed_text.replace('•', '-').replace('–', '-')
+    processed_text = processed_text.replace('—', '-').replace('…', '...')
+    processed_text = processed_text.replace('\u200b', '')  # zero-width space
     print(f"[Voice] Texto processado: {len(processed_text)} chars")
 
-    # 1. Edge-TTS (qualidade boa, funciona sempre)
+    # 1. Edge-TTS (motor primário)
     mp3_path = output_path if output_path.lower().endswith(".mp3") else output_path + ".mp3"
-    result = await generate_voice_edge(processed_text, mp3_path, language)
+    result = await generate_voice_edge(processed_text, mp3_path, language, voice=voice)
     if result and os.path.exists(mp3_path):
-        # Converter para WAV se necessário
         if not output_path.lower().endswith(".mp3"):
             try:
                 from pydub import AudioSegment
@@ -306,12 +297,11 @@ async def generate_voice(
         print(f"[Voice] Edge-TTS OK: {output_path}")
         return output_path
 
-    # 2. Fallback final: gTTS
-    print("[Voice] Usando gTTS (fallback final)...")
+    # 2. Fallback: gTTS
+    print("[Voice] Usando gTTS (fallback)...")
     mp3_path = output_path if output_path.lower().endswith(".mp3") else output_path + ".mp3"
     await generate_voice_gtts(processed_text, mp3_path, language)
     if os.path.exists(mp3_path):
-        # Converter para WAV se necessário
         if not output_path.lower().endswith(".mp3"):
             try:
                 from pydub import AudioSegment
@@ -333,9 +323,9 @@ async def generate_voice(
 async def generate_voice_batch(
     scenes: List[Dict],
     output_dir: str,
-    voice: str = "pf_dora",
+    voice: str = "pt-BR-AntonioNeural",
     language: str = "pt",
-    gender: str = "feminina",
+    gender: str = "masculina",
 ) -> List[str]:
     """
     Gera áudio para múltiplas cenas.

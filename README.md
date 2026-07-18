@@ -27,14 +27,20 @@ Dezafira é uma plataforma de ponta a ponta para criação, otimização e publi
 │  │              Orchestrator (MoviePy + Whisper)          │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │         🆕 Fábrica de Blogs (BlogDirector)            │   │
+│  │   LLM → Artigo → SEO → Imagem → Publicar → Indexar   │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐  │
 │  │ Trend Hunter│  │ Telegram Bot │  │  Database (SQL)   │  │
-│  │ (Scrapling) │  │  (Hermes)    │  │  Channels/Preds   │  │
+│  │ (Scrapling) │  │  (Hermes)    │  │  Channels/Preds/  │  │
+│  │             │  │              │  │  BlogPosts        │  │
 │  └─────────────┘  └──────────────┘  └───────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Pipeline de Produção
+### Pipeline de Produção (Vídeo)
 
 ```
 Tema/Theme
@@ -50,6 +56,22 @@ Video (ComfyUI) — Geração de clipes visuais via prompts de IA
 Orchestrator (MoviePy + Whisper) — Montagem final + legendas dinâmicas palavra por palavra
     ↓
 Uploader (Playwright Stealth) — Publicação automática no YouTube Studio
+```
+
+### Pipeline de Blog (Fábrica de Blogs)
+
+```
+Tema / Ideia
+    ↓
+BlogWriter (LLM) — Gera artigo completo com SEO, títulos, meta description
+    ↓
+SEO Optimizer — JSON-LD, Open Graph, Twitter Cards, score + gap analysis
+    ↓
+ImageGen (Google Flow / FLUX) — Imagem de capa opcional
+    ↓
+BlogPublisher — WordPress (REST+XML-RPC), Blogger, Medium, Dev.to
+    ↓
+Google Indexing API — Notifica Google para indexação instantânea (200 URLs/dia grátis)
 ```
 
 ---
@@ -122,6 +144,11 @@ GOOGLE_CLIENT_SECRET=client-secret
 # ComfyUI (padrão: 127.0.0.1:8188)
 COMFYUI_SERVER=127.0.0.1:8188
 
+# Google Indexing API (OAuth 2.0 — ver docs/setup_google_indexing.md)
+# GOOGLE_OAUTH_CLIENT_ID=...
+# GOOGLE_OAUTH_CLIENT_SECRET=...
+# GOOGLE_OAUTH_REFRESH_TOKEN=...
+
 # Banco de dados (opcional - padrão: SQLite local)
 DATABASE_URL=postgresql://user:pass@host/db
 ```
@@ -153,15 +180,33 @@ dezafira/
 │   │   ├── youtube_api_uploader.py  # YouTube API OAuth upload
 │   │   ├── scrapling_agent.py   # Trend hunting (YouTube)
 │   │   ├── agent_login.py       # Login stealth Playwright
-│   │   ├── database.py          # SQLAlchemy ORM
-│   │   └── telegram_bot.py      # Bot Telegram (Hermes)
+│   │   ├── database.py          # SQLAlchemy ORM (inclui BlogChannel + BlogPost)
+│   │   ├── telegram_bot.py      # Bot Telegram (Hermes)
+│   │   ├── blog_writer.py       # 🆕 Geração de artigos via LLM
+│   │   ├── blog_publisher.py    # 🆕 Publicação: WordPress, Blogger, Medium, Dev.to
+│   │   ├── seo_optimizer.py     # 🆕 Otimização SEO (JSON-LD, meta, scoring)
+│   │   ├── google_indexer.py    # 🆕 Google Indexing API (OAuth 2.0 / Service Account)
+│   │   ├── google_oauth_setup.py # 🆕 Setup OAuth 2.0 para Indexing API
+│   │   └── blog_manager.py      # 🆕 BlogDirector (orquestrador da pipeline)
+│   ├── credentials/             # 🆕 Credenciais Google OAuth
+│   │   └── oauth_client.json    # Client ID OAuth 2.0 Desktop
+│   ├── brand_config/
+│   │   ├── brand_bible.md
+│   │   ├── target_audience.md
+│   │   ├── voice_guide.md
+│   │   ├── ctas.md
+│   │   └── blog/                # 🆕 Brand config para blogs
+│   │       ├── brand_bible.md
+│   │       └── examples.json
+│   ├── docs/
+│   │   └── setup_google_indexing.md  # 🆕 Guia de setup da Indexing API
 │   └── assets/
 │       └── workflows/           # Workflows ComfyUI
 │
 ├── open-generative-ai/          # Frontend Next.js
 │   ├── app/                     # Next.js App Router
-│   ├── components/              # React components
-│   ├── src/                     # Source (ImageStudio, VideoStudio, etc.)
+│   ├── components/              # React components (StandaloneShell com "Fábrica de Blogs")
+│   ├── src/                     # Source (ImageStudio, VideoStudio, BlogStudio, etc.)
 │   └── package.json
 │
 ├── start_dezafira_local.bat     # Script de inicialização Windows
@@ -185,6 +230,11 @@ dezafira/
 | **Orchestrator** | Monta o vídeo final: junta voz + música + legendas dinâmicas (Whisper). |
 | **Uploader** | Publica vídeos no YouTube Studio via Playwright Stealth ou API OAuth. |
 | **Telegram Bot** | Permite controle remoto da fábrica via Telegram. |
+| **BlogWriter** | 🆕 Gera artigos completos com SEO via LLM (Nvidia NIM / DeepSeek). |
+| **BlogPublisher** | 🆕 Publica em WordPress, Blogger, Medium, Dev.to. |
+| **SEO Optimizer** | 🆕 JSON-LD, Open Graph, Twitter Cards, scoring 0-100. |
+| **Google Indexer** | 🆕 Indexação instantânea no Google (200 URLs/dia grátis). |
+| **BlogDirector** | 🆕 Orquestrador da pipeline de blog (tema → publicado + indexado). |
 
 ---
 
@@ -206,6 +256,17 @@ dezafira/
 | `GET` | `/api/v1/trends` | Buscar tendências do YouTube |
 | `POST` | `/api/v1/hermes/analyze-video` | Análise reversa de vídeo concorrente |
 | `GET` | `/api/v1/logs` | Logs de atividade em tempo real |
+| `GET` | `/api/v1/blogs/channels` | 🆕 Listar canais de blog cadastrados |
+| `POST` | `/api/v1/blogs/channels` | 🆕 Criar canal de blog |
+| `PUT` | `/api/v1/blogs/channels/{id}` | 🆕 Atualizar canal de blog |
+| `DELETE` | `/api/v1/blogs/channels/{id}` | 🆕 Remover canal de blog |
+| `GET` | `/api/v1/blogs/posts` | 🆕 Listar artigos do blog |
+| `POST` | `/api/v1/blogs/write` | 🆕 Escrever artigo (LLM) |
+| `POST` | `/api/v1/blogs/publish` | 🆕 Publicar artigo em plataforma |
+| `POST` | `/api/v1/blogs/seo-optimize` | 🆕 Otimizar SEO do artigo |
+| `POST` | `/api/v1/blogs/google-index` | 🆕 Indexar URL no Google |
+| `POST` | `/api/v1/blogs/pipeline` | 🆕 Pipeline completa: escrever → SEO → publicar → indexar |
+| `POST` | `/api/v1/blogs/ideas` | 🆕 Gerar ideias de artigos via LLM |
 
 ---
 
@@ -213,10 +274,15 @@ dezafira/
 
 Os templates em `SniperVideoEngine/brand_config/` permitem personalizar a identidade de cada canal:
 
+### Vídeo
 - **brand_bible.md** — Nome, nicho, proposta de valor, tom de voz
 - **target_audience.md** — Idade, medos, desejos, linguagem do público
 - **voice_guide.md** — Persona gramatical, ritmo, frases proibidas/permitidas
 - **ctas.md** — Produtos, preços e CTAs nativos para cada canal
+
+### Blog
+- **blog/brand_bible.md** — 🆕 Identidade editorial do blog
+- **blog/examples.json** — 🆕 Exemplos few-shot de artigos
 
 ---
 
@@ -229,6 +295,24 @@ A pipeline opera em modo de curadoria:
 4. **Jonatas aprova ou rejeita** via botões na interface
 5. **Se aprovado**, o upload é disparado automaticamente no YouTube
 6. **Se rejeitado**, o Hermes recebe o feedback e ajusta a próxima produção
+
+---
+
+## ⚡ Melhorias de Engenharia Implementadas (Sessão Atual)
+
+Implementamos uma série de robustezes no motor local da Fábrica:
+
+### 1. Legendagem Dinâmica com Quebra Automática (Anti-Corte)
+* **Problema:** Em vídeos verticais (Shorts), palavras longas ou em caixa alta saíam da lateral da tela quando geradas pelo `MoviePy`.
+* **Solução:** Aplicamos restrição de largura máxima de `900px` (com `90px` de margem de segurança de cada lado) e ativamos o parâmetro `method='caption'` no `TextClip`. Agora as palavras grandes realizam **quebra automática de linha** mantendo o enquadramento perfeito nos Shorts.
+
+### 2. Duração Calibrada de 1 Minuto
+* **Problema:** O uvicorn gerava vídeos com menos de 30 segundos porque os prompts de IA geravam roteiros muito curtos.
+* **Solução:** Calibramos a máquina de estados (`pipeline/orchestrator.py` e `open_montage_bridge.py`) para injetar `target_duration=60` como padrão. O roteirista calcula automaticamente o volume de palavras proporcional a 1 minuto de vídeo.
+
+### 3. Hermes Agent com Autonomia de Produção por Chat
+* **Problema:** O chat do Hermes não possuía integração direta com o disparo da esteira de vídeos.
+* **Solução:** O endpoint `/api/v1/hermes/chat` agora intercepta ordens em português como *"crie um vídeo vertical de 1 minuto sobre o tema Reino de Deus"*, limpa o tema de forma inteligente, detecta o formato horizontal/vertical e inicia a esteira em segundo plano, atualizando o progresso da UI.
 
 ---
 

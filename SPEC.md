@@ -32,6 +32,8 @@ Dezafira é uma fábrica autônoma de canais YouTube. A pipeline gera vídeos ve
 | 8 | DB | **SQLAlchemy** + **SQLite** | MIT | Local | `database.py` | 🟢 Manter |
 | 9 | Notificações | **Telegram Bot** (pyTelegramBotAPI) | GPL | Local | `telegram_bot.py` | 🟢 Manter |
 | 10 | Frontend | **Next.js 15** | MIT | Local | `open-generative-ai/` | 🟢 Manter |
+| 11 | Imagem (IA) | **Google Flow (ELTON FLOW via Obscura)** | Gratuito | Browser | `modules/obscura_image_gen.py` | 🟢 Integrado (default grátis) |
+| 12 | Estilos/Locks | **Presets ELTON VIDEO MAKER** | Gratuito | Local | `modules/styles.py` | 🟢 Integrado |
 
 ### Ferramentas REMOVIDAS da stack
 
@@ -483,3 +485,45 @@ Estes templates são lidos pelo Brain (Hermes) para contextualizar os roteiros.
 ---
 
 *SPEC v1.0 — Baseado em pesquisa realizada em 2026-06-30.*
+
+---
+
+## 10. Integração ELTON FLOW (2026-07-09)
+
+**Objetivo:** produzir vídeos **originais e monetizáveis** a custo **$0** usando o
+Google Flow (gratuito) como gerador de imagens, com consistência visual de canal
+via o sistema de *consistency locks* do ELTON VIDEO MAKER. Substitui a dependência
+de API paga (OpenRouter/Gemini) como caminho padrão de imagens.
+
+### 10.1 Arquivos criados/modificados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `modules/styles.py` | **NOVO.** Presets visuais (boneco_palito, storybook, 3d_pixar, realista, anime, aquarela, minimalista, personalizado) + builder de locks (`STYLE_LOCK`, `CHARACTER_LOCK`, `WORLD_LOCK`, `COMPOSITION_LOCK`, `NEGATIVE_LOCK`). |
+| `modules/prompt_engine.py` | `generate_scene_plan`/`generate_full_video_plan` aceitam `style_id`, `style_custom`, `character`, `world`; injetam os locks no roteirista e ancoram o `master` do estilo em todas as cenas. Mantém compat com `style_hint` legado. |
+| `modules/obscura_image_gen.py` | **REWRITE.** Automação Google Flow via Playwright (main world) portando do ELTON FLOW: anti-pause shim + keep-alive (30Hz), **React fiber submit** (`onSubmit(true)` bypass isTrusted), detecção/download via API `flow.projectInitialData` + `getMediaUrlRedirect?name=` (com **fallback DOM**), wait com settle + dedup por `name`, retries no CDN 500, nome `[MM-SS]`. |
+| `server.py` | Endpoints `/api/v1/ai-video/plan` e `/generate` aceitam `style_id`/`character`/`world`; `/generate` agora gera por **default grátis** (`method=imagefx` → Google Flow); novo endpoint `/api/v1/ai-video/styles` lista os presets. |
+
+### 10.2 Fluxo de geração (padrão grátis)
+
+```
+tema + style_id ─▶ PromptEngine (locks) ─▶ plano cenas
+                                      │
+                                      ▼
+                         ObscuraImageGen (Google Flow)
+                         anti-pause + fiber submit + API fetch
+                                      │
+                                      ▼
+                       imagens [MM-SS].png  ($0.00)
+                                      │
+                                      ▼
+              narração (Kokoro/Edge) + montagem → vídeo
+```
+
+### 10.3 Próximos passos (ver `CAPCUT_AGENT_PLAN.md`)
+
+- Exportar **draft editável do CapCut** (cena-por-cena) a partir das imagens geradas.
+- **Agente de finalização**: abre o CapCut, aplica ações (legendas auto, transições,
+  ajustes) e clica em *Export* para renderizar o vídeo final.
+
+*Adicionado em 2026-07-09.*

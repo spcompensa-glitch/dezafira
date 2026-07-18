@@ -16,7 +16,7 @@ def init_telegram_bot(on_chat_message_cb, on_produce_command_cb):
     """
     global bot
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("[Telegram Bot] ⚠️ TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos nas variáveis. Bot inativo.")
+        print("[Telegram Bot] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID nao definidos nas variaveis. Bot inativo.")
         return
 
     try:

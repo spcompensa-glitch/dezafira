@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dezafira Entregável</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --bg: #090D16;
+            --surface: #131A2C;
+            --text: #F3F4F6;
+            --text-muted: #9CA3AF;
+            --border: #1E293B;
+            --primary-glow: rgba(59, 130, 246, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+            transition: all 0.25s ease;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism background decor */
+        .decor-circle {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.4;
+        }
+
+        .circle-1 {
+            width: 300px;
+            height: 300px;
+            background: var(--primary);
+            top: -50px;
+            left: -100px;
+        }
+
+        .circle-2 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary-dark);
+            bottom: -50px;
+            right: -100px;
+        }
+
+        header {
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            z-index: 10;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.3rem;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        main {
+            flex: 1;
+            width: 100%;
+            max-width: 600px;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* Views management */
+        .view {
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Dynamic Landing Page */
+        .hero {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .hero h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #FFF 50%, var(--primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 4px 14px var(--primary-glow);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--primary-glow);
+        }
+
+        .testimonials {
+            margin-top: 50px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .testimonials h3 {
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .testimonial-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 16px;
+        }
+
+        .testi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .testi-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .testi-stars {
+            color: #FBBF24;
+            font-size: 0.85rem;
+        }
+
+        .testi-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        /* Quiz View */
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background-color: var(--surface);
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+        }
+
+        .question-card h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 25px;
+            line-height: 1.3;
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option-item {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            padding: 18px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .option-item:hover {
+            border-color: var(--primary);
+            background-color: var(--primary-glow);
+            transform: translateX(4px);
+        }
+
+        /* Loading View */
+        .loading-container {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .spinner {
+            border: 4px solid var(--surface);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Paywall View */
+        .diagnostic-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .diag-title {
+            color: #EF4444;
+            font-weight: 800;
+            font-size: 1.2rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .diag-desc {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .pricing-section {
+            text-align: center;
+            border-top: 1px dashed var(--border);
+            padding-top: 25px;
+        }
+
+        .price-tag {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 20px;
+        }
+
+        .price-tag span {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .checkout-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pay-tab {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background-color: var(--surface);
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .pay-tab.active {
+            border-color: var(--primary);
+            background-color: var(--primary-glow);
+        }
+
+        .pix-area {
+            text-align: center;
+            background: #182235;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .pix-area.active {
+            display: block;
+        }
+
+        .qr-placeholder {
+            background: white;
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 15px;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-placeholder img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .pix-copia {
+            background: var(--bg);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            margin-bottom: 12px;
+            user-select: all;
+        }
+
+        .sim-pay-btn {
+            background: #10B981;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        .sim-pay-btn:hover {
+            background: #059669;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Premium Content View */
+        .premium-card {
+            background-color: var(--surface);
+            border: 1px solid #10B981;
+            border-radius: 20px;
+            padding: 30px;
+        }
+
+        .premium-title {
+            color: #10B981;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 15px;
+        }
+
+        .premium-content {
+            color: var(--text);
+            line-height: 1.6;
+            font-size: 1rem;
+        }
+
+        .premium-content ul {
+            margin-top: 15px;
+            margin-left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="decor-circle circle-1"></div>
+    <div class="decor-circle circle-2"></div>
+
+    <header>
+        <div class="logo" id="logoText">DEZAFIRA<span>APPS</span></div>
+        <div class="testi-stars">★★★★★</div>
+    </header>
+
+    <main>
+        <!-- 1. LANDING PAGE VIEW -->
+        <section id="view-landing" class="view active">
+            <div class="hero">
+                <h1 id="lp-title">Diagnóstico Comportamental</h1>
+                <p id="lp-subtitle">Descubra em menos de 3 minutos o que está acontecendo com seu pet e como corrigir de forma simples.</p>
+                <button class="btn" id="start-btn">Iniciar Avaliação Gratuita</button>
+            </div>
+
+            <div class="testimonials">
+                <h3>Depoimentos</h3>
+                <div id="testimonials-list">
+                    <!-- Dinâmico -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. QUIZ VIEW -->
+        <section id="view-quiz" class="view">
+            <div class="progress-container">
+                <div class="progress-bar" id="quiz-progress"></div>
+            </div>
+            <div class="question-card" id="question-card">
+                <!-- Dinâmico -->
+            </div>
+        </section>
+
+        <!-- 3. LOADING/ANALYZING VIEW -->
+        <section id="view-loading" class="view">
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <h2 id="loading-text">Processando suas respostas...</h2>
+                <p style="color: var(--text-muted); margin-top: 10px;">A IA está montando seu relatório customizado.</p>
+            </div>
+        </section>
+
+        <!-- 4. PAYWALL VIEW -->
+        <section id="view-paywall" class="view">
+            <div class="diagnostic-card">
+                <div class="diag-title">
+                    <span>⚠️</span> <span id="paywall-diag-title">Resultado Parcial</span>
+                </div>
+                <div class="diag-desc" id="paywall-diag-desc">
+                    Identificamos padrões de alta relevância com base em suas respostas. Seu relatório parcial está completo.
+                </div>
+            </div>
+
+            <div class="diagnostic-card" style="border-color: var(--primary);">
+                <div class="diag-title" style="color: var(--primary);">
+                    <span>🔒</span> <span id="paywall-premium-title">Plano Completo Bloqueado</span>
+                </div>
+                <div class="diag-desc" id="paywall-premium-desc">
+                    Adquira o plano completo de rotina de 12 meses para destravar as recomendações.
+                </div>
+                
+                <div class="pricing-section">
+                    <div class="price-tag" id="price-display">R$ 9,90 <span>pago único</span></div>
+                    
+                    <div class="checkout-options">
+                        <div class="pay-tab active" id="tab-mp">Mercado Pago (Pix)</div>
+                        <div class="pay-tab" id="tab-stripe">Stripe (Cartão)</div>
+                    </div>
+
+                    <div class="pix-area active" id="pix-area">
+                        <div class="qr-placeholder">
+                            <!-- SVG QR Code Falso premium -->
+                            <svg viewBox="0 0 100 100" width="160" height="160">
+                                <rect width="100" height="100" fill="white"/>
+                                <rect x="10" y="10" width="25" height="25" fill="black"/>
+                                <rect x="15" y="15" width="15" height="15" fill="white"/>
+                                <rect x="18" y="18" width="9" height="9" fill="black"/>
+                                <rect x="65" y="10" width="25" height="25" fill="black"/>
+                                <rect x="70" y="15" width="15" height="15" fill="white"/>
+                                <rect x="73" y="18" width="9" height="9" fill="black"/>
+                                <rect x="10" y="65" width="25" height="25" fill="black"/>
+                                <rect x="15" y="70" width="15" height="15" fill="white"/>
+                                <rect x="18" y="73" width="9" height="9" fill="black"/>
+                                <rect x="45" y="45" width="10" height="10" fill="black"/>
+                                <rect x="65" y="65" width="10" height="10" fill="black"/>
+                                <rect x="55" y="65" width="5" height="15" fill="black"/>
+                                <rect x="80" y="80" width="10" height="10" fill="black"/>
+                            </svg>
+                        </div>
+                        <div class="pix-copia" id="pix-key-text">00020126360014BR.GOV.BCB.PIX0114test-pix-key52040000...</div>
+                        <button class="btn" style="background:#4B5563; margin-bottom: 10px;" id="copy-pix-btn">Copiar Chave Pix</button>
+                    </div>
+
+                    <button class="btn sim-pay-btn" id="pay-confirm-btn">Confirmar Pagamento Simulado</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. PREMIUM RESULTS VIEW -->
+        <section id="view-premium" class="view">
+            <div class="premium-card">
+                <div class="premium-title">🎉 Pagamento Confirmado!</div>
+                <div class="premium-content">
+                    <h3>Seu Plano de Ação Personalizado de 12 Meses:</h3>
+                    <p style="margin-top: 10px; color: var(--text-muted);" id="final-advice">
+                        Obrigado por confiar no nosso sistema. Aqui estão as suas recomendações detalhadas:
+                    </p>
+                    <ul id="final-bullets">
+                        <li>Foque em passeios diários de no mínimo 30 minutos em horários silenciosos.</li>
+                        <li>Utilize brinquedos recheáveis com petiscos congelados para diminuir a ansiedade.</li>
+                        <li>Aumente o enriquecimento olfativo espalhando ração seca pelo quintal/casa.</li>
+                        <li>Evite despedidas longas ou barulhentas ao sair de casa.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // API Base configuration
+        const API_BASE = window.location.origin;
+        
+        // State variables
+        let appConfig = null;
+        let currentQuestionIndex = 0;
+        let answers = [];
+        let transactionId = "tx_" + Math.random().toString(36).substr(2, 9);
+        let selectedGateway = "mercadopago";
+
+        // DOM elements
+        const views = {
+            landing: document.getElementById('view-landing'),
+            quiz: document.getElementById('view-quiz'),
+            loading: document.getElementById('view-loading'),
+            paywall: document.getElementById('view-paywall'),
+            premium: document.getElementById('view-premium')
+        };
+
+        // Helper to change views
+        function showView(viewName) {
+            Object.keys(views).forEach(key => {
+                if(key === viewName) {
+                    views[key].classList.add('active');
+                } else {
+                    views[key].classList.remove('active');
+                }
+            });
+        }
+
+        // Fetch App Data based on slug in URL or query parameter
+        async function initApp() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let slug = urlParams.get('app');
+            
+            // Fallback for path-based slug (ex: apps.dezafira.com/c/gatos-ansiosos)
+            if(!slug) {
+                const pathParts = window.location.pathname.split('/');
+                slug = pathParts[pathParts.length - 1] || 'gatos-ansiosos';
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/deliverables/${slug}`);
+                if(res.ok) {
+                    appConfig = await res.json();
+                    applyConfig(appConfig);
+                } else {
+                    console.error("Não foi possível carregar o app. Usando dados demo.");
+                    loadDemoConfig();
+                }
+            } catch(err) {
+                console.error("Erro ao conectar com a API:", err);
+                loadDemoConfig();
+            }
+        }
+
+        function applyConfig(data) {
+            const conf = data.config_json || data;
+            
+            // Apply colors
+            if(conf.primaryColor) {
+                document.documentElement.style.setProperty('--primary', conf.primaryColor);
+                document.documentElement.style.setProperty('--primary-glow', conf.primaryColor + '20');
+            }
+            if(conf.secondaryColor) {
+                document.documentElement.style.setProperty('--primary-dark', conf.secondaryColor);
+            }
+            
+            // Apply texts
+            document.title = conf.title || "Diagnóstico Inteligente";
+            document.getElementById('logoText').innerHTML = (conf.title ? conf.title.split(' ')[0].toUpperCase() : 'DEZAFIRA') + '<span>APP</span>';
+            document.getElementById('lp-title').innerText = conf.title || "Diagnóstico";
+            document.getElementById('lp-subtitle').innerText = conf.subtitle || "Responda as perguntas.";
+            
+            // Testimonials
+            const testiContainer = document.getElementById('testimonials-list');
+            testiContainer.innerHTML = '';
+            if(conf.testimonials && conf.testimonials.length) {
+                conf.testimonials.forEach(t => {
+                    testiContainer.innerHTML += `
+                        <div class="testimonial-card">
+                            <div class="testi-header">
+                                <div class="testi-name">${t.name} <span style="font-weight:400; color:var(--text-muted); font-size:0.8rem;">(${t.role})</span></div>
+                                <div class="testi-stars">${'★'.repeat(t.rating)}</div>
+                            </div>
+                            <div class="testi-text">"${t.text}"</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Pricing displays
+            if(conf.pricing) {
+                const formattedPrice = (conf.pricing.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: conf.pricing.currency || 'BRL' });
+                document.getElementById('price-display').innerHTML = `${formattedPrice} <span>pagamento único</span>`;
+                document.getElementById('pay-confirm-btn').innerText = conf.pricing.button_text || "Confirmar Pagamento";
+            }
+
+            // Paywall text
+            if(conf.free_results) {
+                document.getElementById('paywall-diag-title').innerText = conf.free_results.title;
+                document.getElementById('paywall-diag-desc').innerText = conf.free_results.description;
+            }
+            if(conf.premium_results_preview) {
+                document.getElementById('paywall-premium-title').innerText = conf.premium_results_preview.title;
+                document.getElementById('paywall-premium-desc').innerText = conf.premium_results_preview.description;
+            }
+        }
+
+        function loadDemoConfig() {
+            const demo = {
+                title: "Avaliação Psicológica de Gatos",
+                subtitle: "Entenda por que seu gato está miando demais ou arranhando os móveis e resolva em 7 dias.",
+                primaryColor: "#EC4899",
+                secondaryColor: "#DB2777",
+                questions: [
+                    {
+                        id: "q1",
+                        questionText: "Com que frequência seu gato mia de forma excessiva durante a noite?",
+                        options: [
+                            {"text": "Todas as noites", "points": 3},
+                            {"text": "Algumas vezes na semana", "points": 2},
+                            {"text": "Raramente ou nunca", "points": 1}
+                        ]
+                    },
+                    {
+                        id: "q2",
+                        questionText: "Ele costuma lamber o próprio corpo de forma obsessiva?",
+                        options: [
+                            {"text": "Sim, até criar feridas", "points": 3},
+                            {"text": "Às vezes limpa em excesso", "points": 2},
+                            {"text": "Normal, sem obsessão", "points": 1}
+                        ]
+                    }
+                ],
+                testimonials: [
+                    {
+                        name: "Camila Fernandes",
+                        role: "Dona da Mel, 2 anos",
+                        text": "Minha gata miava a noite inteira. Com a rotina de brinquedos que o plano indicou ela passou a dormir a noite toda!",
+                        rating: 5
+                    }
+                ]
+            };
+            appConfig = demo;
+            applyConfig(demo);
+        }
+
+        // Quiz execution
+        function startQuiz() {
+            currentQuestionIndex = 0;
+            answers = [];
+            showView('quiz');
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const questions = appConfig.config_json ? appConfig.config_json.questions : appConfig.questions;
+            if(!questions || currentQuestionIndex >= questions.length) {
+                finishQuiz();
+                return;
+            }
+            
+            const q = questions[currentQuestionIndex];
+            const percent = (currentQuestionIndex / questions.length) * 100;
+            document.getElementById('quiz-progress').style.width = percent + '%';
+            
+            const card = document.getElementById('question-card');
+            card.innerHTML = `
+                <h2>${q.questionText}</h2>
+                <div class="options-list">
+                    ${q.options.map((opt, idx) => `
+                        <div class="option-item" onclick="selectOption(${opt.points})">
+                            <span>${opt.text}</span>
+                            <span>➔</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        window.selectOption = function(points) {
+            answers.push(points);
+            currentQuestionIndex++;
+            renderQuestion();
+        };
+
+        function finishQuiz() {
+            showView('loading');
+            
+            // Create Checkout transaction in backend
+            fetch(`${API_BASE}/api/v1/deliverables/checkout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    app_id: appConfig.id || "demo",
+                    gateway: selectedGateway,
+                    amount: appConfig.config_json ? appConfig.config_json.pricing.price_cents : 990,
+                    customer_email: "usuario_checkout@dezafira.com",
+                    transaction_id: transactionId
+                })
+            }).then(res => res.json()).then(checkout => {
+                if(checkout.qr_code_pix) {
+                    document.getElementById('pix-key-text').innerText = checkout.qr_code_pix;
+                }
+            }).catch(err => console.error("Erro no checkout:", err));
+
+            // Simular análise inteligente da IA por 3 segundos
+            setTimeout(() => {
+                showView('paywall');
+            }, 3000);
+        }
+
+        // Initialize event listeners
+        document.getElementById('start-btn').addEventListener('click', startQuiz);
+        
+        // Checkout Tabs
+        const tabMP = document.getElementById('tab-mp');
+        const tabStripe = document.getElementById('tab-stripe');
+        const pixArea = document.getElementById('pix-area');
+
+        tabMP.addEventListener('click', () => {
+            selectedGateway = "mercadopago";
+            tabMP.classList.add('active');
+            tabStripe.classList.remove('active');
+            pixArea.classList.add('active');
+        });
+
+        tabStripe.addEventListener('click', () => {
+            selectedGateway = "stripe";
+            tabStripe.classList.add('active');
+            tabMP.classList.remove('active');
+            pixArea.classList.remove('active');
+        });
+
+        // Simula webhook de pagamento aprovado
+        document.getElementById('pay-confirm-btn').addEventListener('click', () => {
+            document.getElementById('pay-confirm-btn').innerText = "Processando pagamento...";
+            
+            const webhookUrl = selectedGateway === "mercadopago" 
+                ? `${API_BASE}/api/v1/deliverables/webhooks/mercadopago`
+                : `${API_BASE}/api/v1/deliverables/webhooks/stripe`;
+                
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transaction_id: transactionId,
+                    status: "approved",
+                    type: "checkout.session.completed"
+                })
+            }).then(res => res.json()).then(data => {
+                showView('premium');
+            }).catch(err => {
+                console.error("Erro ao simular webhook:", err);
+                showView('premium'); // Fallback visual
+            });
+        });
+
+        document.getElementById('copy-pix-btn').addEventListener('click', () => {
+            const keyText = document.getElementById('pix-key-text').innerText;
+            navigator.clipboard.writeText(keyText);
+            alert("Chave Pix copiada com sucesso!");
+        });
+
+        // Run on load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>

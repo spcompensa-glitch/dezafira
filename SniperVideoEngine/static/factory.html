@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dezafira — Fábrica ELTON FLOW</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a; color: #fff; min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 24px 32px; border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .header .tag {
+            font-size: 10px; font-weight: 800; color: #1ed760;
+            letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 4px;
+        }
+        .header h1 { font-size: 32px; font-weight: 900; letter-spacing: -0.02em; }
+        .header p { color: rgba(255,255,255,0.5); font-size: 14px; margin-top: 4px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 32px; }
+        .grid { display: grid; grid-template-columns: 380px 1fr; gap: 24px; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .panel {
+            background: #141414; border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px; padding: 24px;
+        }
+        .panel h2 { font-size: 16px; font-weight: 800; margin-bottom: 16px; }
+        label { display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.45);
+            letter-spacing: 0.1em; text-transform: uppercase; margin: 14px 0 6px; }
+        input, select, textarea {
+            width: 100%; background: #0d0d0d; border: 1px solid rgba(255,255,255,0.1);
+            color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 14px;
+            font-family: inherit;
+        }
+        textarea { resize: vertical; min-height: 70px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #1ed760; }
+        .row { display: flex; gap: 12px; }
+        .row > div { flex: 1; }
+        .check { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 13px; }
+        .check input { width: auto; }
+        .btn {
+            width: 100%; margin-top: 20px; background: #1ed760; color: #000; border: none;
+            padding: 14px; border-radius: 12px; font-weight: 900; font-size: 14px; cursor: pointer;
+            letter-spacing: 0.05em; text-transform: uppercase; transition: background 0.2s;
+        }
+        .btn:hover { background: #1db954; }
+        .btn:disabled { background: #2a2a2a; color: rgba(255,255,255,0.3); cursor: not-allowed; }
+        .progress-wrap { margin: 20px 0 12px; display: none; }
+        .progress-bar { height: 10px; background: #0d0d0d; border-radius: 6px; overflow: hidden; }
+        .progress-fill {
+            height: 100%; width: 0%; background: linear-gradient(90deg, #1ed760, #3498db);
+            transition: width 0.4s ease;
+        }
+        .progress-meta { display: flex; justify-content: space-between; margin-top: 8px;
+            font-size: 12px; color: rgba(255,255,255,0.5); }
+        .log {
+            margin-top: 12px; background: #0d0d0d; border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px; padding: 12px; font-size: 12px; line-height: 1.7;
+            color: rgba(255,255,255,0.6); max-height: 140px; overflow-y: auto;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+        }
+        .result { display: none; }
+        .result video { width: 100%; border-radius: 12px; background: #000; margin-top: 8px; }
+        .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 10px; }
+        .thumbs img { width: 100%; border-radius: 8px; aspect-ratio: 9/16; object-fit: cover; }
+        .deliverable {
+            background: #0d0d0d; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+            padding: 14px; margin-top: 12px; font-size: 13px;
+        }
+        .deliverable .k { color: rgba(255,255,255,0.45); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+        .deliverable a { color: #1ed760; text-decoration: none; word-break: break-all; }
+        .deliverable a:hover { text-decoration: underline; }
+        .status-pill { font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; }
+        .status-running { background: rgba(52,152,219,0.15); color: #3498db; }
+        .status-done { background: rgba(30,215,96,0.15); color: #1ed760; }
+        .status-error { background: rgba(231,76,60,0.15); color: #e74c3c; }
+        .hint { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 6px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="tag">ELTON FLOW · Fábrica</div>
+        <h1>Dezafira Factory</h1>
+        <p>Plano → Imagens (Google Flow, grátis) → Narração (Kokoro) → Montagem → Projeto CapCut editável.</p>
+    </div>
+
+    <div class="container">
+        <div class="grid">
+            <div class="panel">
+                <h2>🎬 Novo Vídeo</h2>
+                <label>Tema</label>
+                <textarea id="theme" placeholder="Ex: 3 segredos financeiros que os ricos escondem">Como a mente dos milionários funciona</textarea>
+
+                <div class="row">
+                    <div>
+                        <label>Formato</label>
+                        <select id="format">
+                            <option value="vertical">Vertical (9:16)</option>
+                            <option value="horizontal">Horizontal (16:9)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Duração</label>
+                        <input id="duration" type="number" value="60" min="15" max="180">
+                    </div>
+                </div>
+
+                <label>Estilo visual</label>
+                <select id="style_id">
+                    <option value="boneco_palito">Boneco de Palito</option>
+                    <option value="realista">Realista</option>
+                    <option value="anime">Anime</option>
+                    <option value="infantil">Infantil</option>
+                    <option value="">(automático)</option>
+                </select>
+
+                <div class="row">
+                    <div>
+                        <label>Personagem</label>
+                        <input id="character" type="text" placeholder="Opcional">
+                    </div>
+                    <div>
+                        <label>Mundo / Cenário</label>
+                        <input id="world" type="text" placeholder="Opcional">
+                    </div>
+                </div>
+
+                <label>Nome do projeto CapCut</label>
+                <input id="nome_projeto" type="text" value="Dezafira_Auto">
+
+                <div class="check">
+                    <input id="make_draft" type="checkbox" checked>
+                    <label style="margin:0;">Gerar draft editável do CapCut</label>
+                </div>
+
+                <button class="btn" id="startBtn" onclick="start()">Produzir ▶</button>
+                <p class="hint" id="hint">O progresso aparece ao vivo. As imagens vêm do Google Flow (sem custo).</p>
+            </div>
+
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h2>📊 Produção</h2>
+                    <span id="statusPill" class="status-pill status-running" style="display:none;">aguardando</span>
+                </div>
+
+                <div class="progress-wrap" id="progressWrap">
+                    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                    <div class="progress-meta">
+                        <span id="stageLabel">—</span>
+                        <span id="progressPct">0%</span>
+                    </div>
+                </div>
+                <div class="log" id="log">Aguardando início...</div>
+
+                <div class="result" id="result">
+                    <h2 style="margin-top:8px;">✅ Entregas</h2>
+                    <div id="resultBody"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '';
+        let ws = null;
+        let currentTask = null;
+
+        function connectWS() {
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${proto}//${location.host}/ws/pipeline`);
+            ws.onmessage = (ev) => {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    if ((msg.type === 'factory_progress' || msg.type === 'factory_done')
+                        && msg.task_id === currentTask) {
+                        renderStatus(msg);
+                    }
+                } catch (e) {}
+            };
+            ws.onclose = () => { ws = null; };
+        }
+
+        function toUrl(p) {
+            if (!p) return '';
+            const i = p.replace(/\\/g, '/').indexOf('outputs/');
+            if (i === -1) return p;
+            return '/' + p.replace(/\\/g, '/').substring(i);
+        }
+
+        function renderStatus(msg) {
+            document.getElementById('progressWrap').style.display = 'block';
+            const d = msg.task_id === currentTask ? (msg.result || {}) : {};
+            const stage = msg.stage || '—';
+            const prog = msg.progress || 0;
+            document.getElementById('progressFill').style.width = prog + '%';
+            document.getElementById('progressPct').textContent = prog + '%';
+            document.getElementById('stageLabel').textContent = stage;
+            document.getElementById('log').innerHTML += `<div>[${stage}] ${escapeHtml(msg.log || '')}</div>`;
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+
+            const pill = document.getElementById('statusPill');
+            pill.style.display = 'inline-block';
+            if ((msg.type === 'factory_done') || stage === 'done' || stage === 'error') {
+                pill.className = 'status-pill ' + (msg.result && msg.result.ok ? 'status-done' : 'status-error');
+                pill.textContent = (msg.result && msg.result.ok) ? 'pronto' : 'erro';
+                if (msg.type === 'factory_done') renderResult(msg.result);
+            } else {
+                pill.className = 'status-pill status-running';
+                pill.textContent = 'rodando';
+            }
+        }
+
+        function renderResult(r) {
+            if (!r) return;
+            document.getElementById('result').style.display = 'block';
+            let html = '';
+
+            if (r.video) {
+                html += `<div class="deliverable"><div class="k">Vídeo final (MP4)</div>
+                    <video src="${toUrl(r.video)}" controls preload="metadata"></video></div>`;
+            }
+            if (r.audio) {
+                html += `<div class="deliverable"><div class="k">Narração</div>
+                    <audio src="${toUrl(r.audio)}" controls style="width:100%;margin-top:6px;"></audio></div>`;
+            }
+            if (Array.isArray(r.images) && r.images.length) {
+                const thumbs = r.images.filter(i => i.path).map(i =>
+                    `<img src="${toUrl(i.path)}" title="Cena ${i.scene_id}">`).join('');
+                html += `<div class="deliverable"><div class="k">Imagens geradas (${r.images.filter(i=>i.path).length})</div>
+                    <div class="thumbs">${thumbs}</div></div>`;
+            }
+            if (r.capcut_draft && r.capcut_draft.ok) {
+                const dp = r.capcut_draft.draft_path || '';
+                html += `<div class="deliverable"><div class="k">Projeto CapCut editável</div>
+                    <div>Pasta: <code style="word-break:break-all;">${escapeHtml(dp)}</code></div>
+                    ${dp ? `<a href="#" onclick="copyText('${escapeAttr(dp)}');return false;">📋 Copiar caminho</a>` : ''}
+                    <div class="hint">Abra o CapCut → Importar projeto → cole esta pasta. Legenda word-level já incluída.</div></div>`;
+            }
+            const steps = r.steps || {};
+            if (Object.keys(steps).length) {
+                html += `<div class="deliverable"><div class="k">Resumo das etapas</div>
+                    <pre style="white-space:pre-wrap;font-size:11px;color:rgba(255,255,255,0.6);">${escapeHtml(JSON.stringify(steps, null, 2))}</pre></div>`;
+            }
+            if (!html) html = '<div class="deliverable">Nenhuma entrega gerada (verifique o log).</div>';
+            document.getElementById('resultBody').innerHTML = html;
+        }
+
+        async function start() {
+            const theme = document.getElementById('theme').value.trim();
+            if (!theme) { alert('Informe um tema.'); return; }
+            connectWS();
+            const payload = {
+                theme,
+                format: document.getElementById('format').value,
+                duration: parseInt(document.getElementById('duration').value) || 60,
+                style_id: document.getElementById('style_id').value || null,
+                character: document.getElementById('character').value,
+                world: document.getElementById('world').value,
+                nome_projeto: document.getElementById('nome_projeto').value || 'Dezafira_Auto',
+                make_draft: document.getElementById('make_draft').checked,
+            };
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true; btn.textContent = 'Produzindo...';
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('result').style.display = 'none';
+            try {
+                const res = await fetch(`${API}/api/v1/ai-video/factory`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                currentTask = data.task_id;
+                document.getElementById('progressWrap').style.display = 'block';
+                document.getElementById('log').innerHTML = `<div>▶ Tarefa <code>${currentTask}</code> na fila...</div>`;
+                poll();
+            } catch (e) {
+                document.getElementById('log').innerHTML += `<div style="color:#e74c3c;">Erro: ${e.message}</div>`;
+                btn.disabled = false; btn.textContent = 'Produzir ▶';
+            }
+        }
+
+        async function poll() {
+            if (!currentTask) return;
+            try {
+                const res = await fetch(`${API}/api/v1/ai-video/factory/${currentTask}`);
+                const data = await res.json();
+                renderStatus({ type: data.status === 'done' ? 'factory_done' : 'factory_progress',
+                    task_id: currentTask, stage: data.stage, progress: data.progress,
+                    log: data.log, result: data.result });
+                if (data.status === 'running') {
+                    setTimeout(poll, 1500);
+                } else {
+                    const btn = document.getElementById('startBtn');
+                    btn.disabled = false; btn.textContent = 'Produzir ▶';
+                }
+            } catch (e) {}
+        }
+
+        function copyText(t) {
+            navigator.clipboard.writeText(t);
+            alert('Caminho copiado!');
+        }
+        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        function escapeAttr(t) { return String(t).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+    </script>
+</body>
+</html>

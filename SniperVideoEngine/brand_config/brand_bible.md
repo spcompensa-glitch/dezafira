@@ -1,24 +1,29 @@
 # Brand Bible
 
-NOMBRE DEL CANAL: [Nome do Canal]
+NOME DO CANAL: Dezafira
 
-NICHO: [Descrição específica do nicho — evite descrições genéricas]
+NICHO: Mistérios e verdades ocultas da Bíblia. Conteúdo que revela o que a maioria das pessoas não sabe sobre as Escrituras — profecias, simbolismos, conexões entre o Antigo e Novo Testamento, e como tudo se conecta com o mundo atual.
 
-PROPUESTA DE VALOR:
-[Uma frase. Que resultado concreto o espectador obtém de cada vídeo.]
+PROPOSTA DE VALOR:
+Cada vídeo revela uma verdade que vai mudar como você vê a Bíblia. Não é ensino genérico — é descoberta.
 
 TONO:
-[Ex: direto, próximo, com autoridade mas sem ser acadêmico. Como um amigo que sabe mais, não como um professor.]
+Curioso, revelador, como quem está compartilhando um segredo que descobriu. Não é professor falando pra turma — é um amigo que encontrou algo incrível e quer te mostrar. Tom de mistério no início, clareza no meio, impacto no final.
 
-QUÉ EVITAR:
-- [Ex: linguagem corporativa ou muito formal]
-- [Ex: frases motivacionais vazias]
-- [Ex: intros longas sem tensão ou mistério]
+QUE EVITAR:
+- Linguagem religiosa pesada ("abençoado", "graça do Senhor", "em nome de Jesus")
+- Tom de sermão ou pregação
+- Intros longas sem tensão
+- Frases motivacionais vazias
+- Explicações acadêmicas ou teológicas densas
+- Repetir o mesmo conceito de formas diferentes
+- Começar com "Olá pessoal" ou "Neste vídeo"
 
-LONGITUD PROMEDIO DE VIDEOS: [Ex: 1 minuto (Shorts) ou 8 minutos (Longos)]
+DURAÇÃO MÉDIA: 60 segundos (Shorts) — expandindo para 2-3 minutos em longos
 
-FRECUENCIA DE PUBLICACIÓN: [Ex: 3 vídeos por semana]
+FREQUÊNCIA: 3 vídeos por semana
 
-CANALES DE REFERENCIA:
-- [URL Canal 1]
-- [URL Canal 2]
+CANALES DE REFERÊNCIA:
+- Inspiration (YouTube Shorts de mistérios bíblicos)
+- Bible Discovery (revelações e conexões)
+- The Bible Project (visual storytelling bíblico)

@@ -34,7 +34,7 @@ class HermesOrchestrator:
         self,
         theme: str,
         channel_id: str = None,
-        video_format: str = "horizontal",
+        video_format: str = "vertical",
         blocks: list = None,
         task_id: str = None,
     ) -> str:
@@ -135,65 +135,40 @@ class HermesOrchestrator:
         })
 
     async def _run_script_stage(self, pipeline: PipelineEngine):
-        """Executa estágio de roteiro com SniperBrain REAL (Bug C3 fix)."""
+        """Executa estágio de roteiro com ScriptWriter (DeepSeek 6-pass)."""
         stage_name = "script"
         pipeline.start_stage(stage_name)
 
         await self.ws_hub.send_to_task(
             pipeline.state.task_id,
             "stage_log",
-            {"stage": stage_name, "message": "Gerando roteiro com Nvidia NIM (SniperBrain)..."}
+            {"stage": stage_name, "message": "Gerando roteiro com ScriptWriter (DeepSeek 6-pass)..."}
         )
 
-        pipeline.update_progress(stage_name, 25, "Llamando LLM...")
+        pipeline.update_progress(stage_name, 25, "Chamando ScriptWriter...")
 
         try:
-            from modules.brain import SniperBrain
-            brain = SniperBrain()
+            from modules.scriptwriter import ScriptWriter
+            writer = ScriptWriter(channel_id=pipeline.state.channel_id or "default")
 
-            # Recuperar contexto de pesquisa do estagio anterior
-            research_stage = pipeline.state.stages.get("research")
-            trends_ctx = ""
-            if research_stage and research_stage.data:
-                trends_videos = research_stage.data.get("trending_videos", 0)
-                niche_score = research_stage.data.get("niche_score", 0)
-                trends_ctx = f"Nichos score: {niche_score}. Trending videos: {trends_videos}."
-
-            # Shared Memory: Injetar contexto do canal
-            channel_context = ""
-            if pipeline.state.channel_id:
-                try:
-                    from services.memory_service import get_channel_context_prompt
-                    channel_context = get_channel_context_prompt(pipeline.state.channel_id)
-                except Exception as mem_err:
-                    print(f"[Hermes] Shared Memory indisponivel: {mem_err}")
-
-            script_json = brain.generate_script(
+            script_data = await writer.write(
                 theme=pipeline.state.theme,
-                brand=pipeline.state.channel_id or "Geral",
-                trends_context=trends_ctx,
-                channel_context=channel_context,
+                target_seconds=60,
+                video_format=pipeline.state.video_format or "vertical",
+                language="pt",
             )
 
-            # Tentar parsear JSON gerado pelo Brain
-            import json
-            try:
-                script_data = json.loads(script_json) if isinstance(script_json, str) else script_json
-                word_count = len(script_data.get("script", "").split())
-                title = script_data.get("title", pipeline.state.theme)
-            except (json.JSONDecodeError, AttributeError):
-                script_data = {"raw": script_json, "title": pipeline.state.theme}
-                word_count = len(script_json.split()) if isinstance(script_json, str) else 0
+            word_count = script_data.get("word_count", 0)
+            title = script_data.get("title", pipeline.state.theme)
 
             pipeline.update_progress(stage_name, 90, f"Roteiro gerado: {word_count} palavras")
 
             pipeline.complete_stage(stage_name, {
-                "title": title if 'title' in locals() else pipeline.state.theme,
+                "title": title,
                 "script_length": word_count,
                 "word_count": f"{word_count} palavras",
-                "duration_estimate": "8-10 minutos",
+                "duration_estimate": f"{script_data.get('duration_estimate', 60)}s",
                 "script_data": script_data,
-                "channel_context_used": bool(channel_context),
             })
         except Exception as e:
             print(f"[Hermes] Erro no estagio script: {e}")
@@ -289,7 +264,7 @@ class HermesOrchestrator:
                 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 video_path = os.path.join(project_dir, "outputs", f"{pipeline.state.task_id}_preview.mp4")
 
-                visual_keywords = script_data.get("visual_keywords", [pipeline.state.theme]) if script_data else [pipeline.state.theme]
+                visual_keywords = script_data.get("visual_prompts", [pipeline.state.theme]) if script_data else [pipeline.state.theme]
                 if isinstance(visual_keywords, str):
                     visual_keywords = [visual_keywords]
 
@@ -329,6 +304,35 @@ class HermesOrchestrator:
                 })
             else:
                 pipeline.fail_stage(stage_name, "Video nao foi gerado. Verifique logs de producao.")
+
+            # 3. (Aditivo, não-bloqueante) Pipeline ELTON FLOW — imagens originais
+            #    via Google Flow + draft editável do CapCut, como entrega extra.
+            #    Não sobrescreve o vídeo principal; apenas anexa às entregas.
+            try:
+                pipeline.update_progress(
+                    stage_name, 97,
+                    "Gerando entrega adicional ELTON FLOW (imagens Google Flow + draft CapCut)...")
+                from modules.video_pipeline import produce_with_elton
+                elton = await produce_with_elton(
+                    theme=pipeline.state.theme,
+                    video_format=pipeline.state.video_format,
+                    language="pt",
+                    target_seconds=60,
+                    make_draft=True,
+                    nome_projeto=f"Dezafira_{pipeline.state.task_id}",
+                    on_progress=lambda s, p, l: print(f"[Hermes/ELTON] {s} {p}% — {l}"),
+                )
+                produce_stage = pipeline.state.stages.get(stage_name)
+                if produce_stage is not None:
+                    produce_stage.data.setdefault("extras", {})["elton_flow"] = {
+                        "ok": elton.get("ok"),
+                        "images": len([i for i in elton.get("images", []) if i.get("path")]),
+                        "video": elton.get("video"),
+                        "capcut_draft": (elton.get("capcut_draft") or {}).get("draft_path"),
+                    }
+                print(f"[Hermes] ELTON FLOW aditivo concluído: ok={elton.get('ok')}")
+            except Exception as elton_err:
+                print(f"[Hermes] ELTON FLOW aditivo falhou (não-bloqueante): {elton_err}")
         except Exception as e:
             print(f"[Hermes] Erro no estagio produce: {e}")
             pipeline.fail_stage(stage_name, str(e))

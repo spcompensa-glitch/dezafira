@@ -481,4 +481,4 @@ if __name__ == "__main__":
         script, "The #1 Reason You're Still Broke Online", 30.0, "finance", 42
     )
     for s in scenes:
-        print(f"[{s['beat_type']}] {s['visual_prompt'][:60]}... → {s['type']} ({s['confidence']})")
+        print(f"[{s['beat_type']}] {s['visual_prompt'][:60]}... -> {s['type']} ({s['confidence']})")

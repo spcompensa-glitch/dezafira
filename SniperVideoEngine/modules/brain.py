@@ -8,8 +8,8 @@ load_dotenv()
 
 class SniperBrain:
     def __init__(self):
-        self.nvidia_key = os.getenv("NVIDIA_API_KEY")
-        self.deepseek_key = os.getenv("DEEPSEEK_API_KEY")
+        self.nvidia_key = (os.getenv("NVIDIA_API_KEY") or "").strip()
+        self.deepseek_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
         self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "brand_config")
         self.last_provider_used = "none"
 
@@ -20,12 +20,29 @@ class SniperBrain:
                 return f.read()
         return f"[Arquivo {filename} não configurado. Por favor, adicione as diretrizes.]"
 
-    def _call_llm(self, system_prompt, user_prompt, temperature=0.7):
-        """Chama o LLM com fallback: NVIDIA → DeepSeek."""
+    def _call_llm(self, system_prompt, user_prompt, temperature=0.7, max_tokens=4000):
+        """Chama o LLM com fallback: Hermes Agent → NVIDIA → DeepSeek."""
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
+        
+        # 0. Nous Hermes Agent (se disponível)
+        hermes_url = os.getenv("HERMES_API_URL", "").strip()
+        hermes_key = os.getenv("HERMES_API_KEY", "").strip()
+        if hermes_url and hermes_key:
+            try:
+                resp = requests.post(
+                    f"{hermes_url}/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {hermes_key}", "Content-Type": "application/json"},
+                    json={"messages": messages, "model": "nvidia"},
+                    timeout=30.0
+                )
+                if resp.status_code == 200:
+                    self.last_provider_used = "hermes-agent"
+                    return resp.json()["choices"][0]["message"]["content"]
+            except Exception:
+                pass
         
         # 1. NVIDIA (Primary)
         if self.nvidia_key:
@@ -38,7 +55,7 @@ class SniperBrain:
                     "model": "meta/llama-3.1-8b-instruct",
                     "messages": messages,
                     "temperature": temperature,
-                    "max_tokens": 1500
+                    "max_tokens": max_tokens
                 }
                 response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=90.0)
                 if response.status_code == 200:
@@ -46,7 +63,7 @@ class SniperBrain:
                     print("[LLM] NVIDIA respondeu com sucesso!")
                     return response.json()["choices"][0]["message"]["content"]
                 else:
-                    print(f"[LLM] NVIDIA retornou status {response.status_code}")
+                    print(f"[LLM] NVIDIA retornou status {response.status_code}: {response.text[:200]}")
             except Exception as e:
                 print(f"[LLM] Erro ao chamar NVIDIA: {e}")
         
@@ -61,7 +78,7 @@ class SniperBrain:
                     "model": "deepseek-chat",
                     "messages": messages,
                     "temperature": temperature,
-                    "max_tokens": 1500
+                    "max_tokens": max_tokens
                 }
                 response = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60.0)
                 if response.status_code == 200:
